@@ -1,0 +1,7 @@
+run: False
+venvpath : "/data2/vermarien/uclchem-dev/v3.1.0/.venv"
+uclchemdir : "/data2/vermarien/uclchem-dev/v3.1.0/"
+outputdir : "/data2/vermarien/uclchem-dev/v3.1.0/examples/example-output"
+hdf5root : "output_files"
+runname : "Reference"
+comment: "The reference value that is provided on Github."

@@ -1,0 +1,7 @@
+run: True
+venvpath : "/data2/vermarien/uclchem-dev/v3.1.0-dev-h3tomolhydrogen/.venv/"
+uclchemdir : "/data2/vermarien/uclchem-dev/v3.1.0-dev-h3tomolhydrogen/"
+outputdir : "/data2/vermarien/uclchem-dev/v3.1.0-dev-h3tomolhydrogen/examples/test-output"
+hdf5root : "output_files"
+runname : "v3.1.0-dev-h3tomolhydrogen"
+ccomment: "Version without handle H3+->#H+#H2 and HEH+->#H+#HE"
