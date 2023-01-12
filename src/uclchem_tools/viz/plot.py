@@ -3,7 +3,11 @@ from seaborn import color_palette
 from cycler import cycler
 from matplotlib.lines import Line2D
 
-from .process import process_data, sort_reaction_df
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import numpy as np
+
+from .process import process_data, sort_by_intersection
 
 custom_cycler = cycler(color=plt.get_cmap("tab10").colors) * cycler(
     linestyle=["solid", "dashed", "dotted", "dashdot"]
@@ -142,29 +146,97 @@ def plot_densities(
     return fig, axes
 
 
-def plot_rates(df, df_dest, df_prod, fig=None, axes=None, xlim=[None, None]):
-    if not fig:
-        fig, axes = plt.subplots(
-            4,
-            1,
-            figsize=(10, 10),
-            sharex=True,
-            tight_layout=True,
-            height_ratios=[1, 1, 1, 0.25],
-        )
-    ax = df.plot(ax=axes[0])
+def plot_rates_comparison(data1, data2, specie):
+    fig = make_subplots(
+        rows=3,
+        cols=2,
+        row_heights=[1, 1, 1],
+        subplot_titles=["v3.1.0", "v3.1.0-dev"]
+        + ["Production"] * 2
+        + ["Destruction"] * 2,
+        shared_xaxes=True,
+        vertical_spacing=0.03,
+    )
+    d1 = process_data(data1, specie)
+    d2 = process_data(data2, specie)
+    # Make sure that the
+    d1, d2 = sort_by_intersection(d1, d2, "df_dest")
+    d1, d2 = sort_by_intersection(d1, d2, "df_prod")
+    plot_rates(**d1, fig=fig, col=1, groupname="left")
+    plot_rates(**d2, fig=fig, col=2, linedict=dict(dash="dash"), groupname="right")
+    # axes[0, 0].set_title("v3.1.0")
+    # axes[0, 1].set_title("v3.1.0-dev")
+    return fig
 
-    ax.set(xscale="log", yscale="log")
-    ax = df_prod.plot(ax=axes[1], legend=False)
-    ax.set(ylim=[1e-3, 1.1], ylabel="Production (%)")
-    ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1), borderaxespad=0)
-    ax.set(xscale="log", yscale="log")
-    ax = df_dest.plot(ax=axes[2], legend=False)
-    ax.set(ylim=[1e-3, 1.1], ylabel="Destruction (%)")
-    ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1), borderaxespad=0)
-    ax.set(xscale="log", yscale="log")
-    if xlim[0] or xlim[1]:
-        ax.set(xlim=xlim)
-    axes[-1].scatter(df.index, df.index != -1)
-    [ax.grid(alpha=0.5) for ax in axes]
-    return fig, axes
+
+def plot_rates(df, df_dest, df_prod, fig=None, col=1, linedict={}, groupname=None):
+    if not fig:
+        fig = make_subplots(
+            rows=3,
+            cols=1,
+            row_heights=[1, 1, 1],
+            subplot_titles=("v3.1.0", "Production", "Destruction", "Samples"),
+            shared_xaxes=True,
+            vertical_spacing=0.03,
+        )
+    print(groupname)
+    # Plot the rates at which the species are produced and destroyed
+    [
+        fig.add_trace(
+            go.Scatter(
+                x=df.index,
+                y=df[term],
+                name=term,
+                legendgroup="1",
+                legendgrouptitle_text="Rates",
+                mode="lines+markers",
+            ),
+            col=col,
+            row=1,
+        )
+        for term in df
+    ]
+
+    # Plot the contribution of each reaction to the production ...
+    for prod_term in df_prod:
+        print(f"Production reactions {groupname}")
+        #
+        fig.add_trace(
+            go.Scatter(
+                x=df_prod.index,
+                y=df_prod[prod_term],
+                name=prod_term,
+                line=linedict,
+                legendgrouptitle_text=f"Production reactions {groupname if groupname else ''}",
+                legendgroup="2" + str(groupname),
+                mode="lines+markers",
+            ),
+            col=col,
+            row=2,
+        )
+    # ... and the destruction despectively.
+    for dest_term in df_dest:
+        # f"Destruction reactions {groupname}"
+        fig.add_trace(
+            go.Scatter(
+                x=df_dest.index,
+                y=df_dest[dest_term],
+                name=dest_term,
+                line=linedict,
+                legendgrouptitle_text=f"Destruction reactions {groupname if groupname else ''}",
+                legendgroup="3" + str(groupname),
+                mode="lines+markers",
+            ),
+            col=col,
+            row=3,
+        )
+
+    fig.update_layout(legend=dict(groupclick="toggleitem"), hovermode="x unified")
+    fig.update_xaxes(type="log", tickformat="~e")
+    fig.update_yaxes(type="log")
+    # Scientific units for the rates, percentages for the contribution of the reactions.
+    [
+        fig.layout[f"yaxis{i+1 if i>0 else ''}"].update(tickformat=style)
+        for i, style in enumerate(["~e", "~%", "~%"])
+    ]
+    return fig
