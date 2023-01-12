@@ -65,6 +65,7 @@ fig.update_layout(
     width=1000,
 )
 fig.update_layout(title_text="Phase 1")
+fig.show()
 
 
 # %%
@@ -106,9 +107,5 @@ fig.update_layout(
 )
 fig.update_layout(title_text="Phase 2")
 
-
-# %%
-
-# %%
 
 # %%
