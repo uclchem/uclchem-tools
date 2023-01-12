@@ -1,0 +1,14 @@
+# Whether or not to run the uclchem script
+run: True 
+# The path of the virtual environment
+venvpath : "/data2/vermarien/uclchem-dev/v3.1.0/.venv"  
+# The directory where the uclchem version (installed in the venv) is located
+uclchemdir : "/data2/vermarien/uclchem-dev/v3.1.0/"
+# The output directory, if run is true, this should be where the script outputs the csv files
+outputdir : "/data2/vermarien/uclchem-dev/v3.1.0/examples/test-output"
+# Where to write the output hdf files to
+hdf5root : "output_files"
+# What name to give the hdf dataset.
+runname : "v3.1.0"
+# A comment that is stored in the dataset, useful for non point release versions of UCLCHEM.
+comment: "Version without any adjustments v3.1.0 at checkout 08d37f8c3063f8ff8a9a7aa16d9eff0ed4f99538"""
