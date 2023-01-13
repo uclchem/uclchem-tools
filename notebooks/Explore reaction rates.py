@@ -77,10 +77,14 @@ fig.update_layout(title_text="Phase 1")
 
 
 # %%
-fig = plot_rates_comparison(data_v3_1_p1, data_v3_2_p1, "C+")
+fig = plot_rates_comparison(data_v3_1_p1, data_v3_2_p1, "H3O+")
 fig.update_layout(
     height=1200,
 )
+[
+    fig.layout[f"yaxis{i+1 if i>0 else ''}"].update(tickformat=style)
+    for i, style in enumerate(["~e", "~e", "~%", "~%", "~%", "~%"])
+]
 fig.update_layout(title_text="Phase 1")
 
 
@@ -93,19 +97,39 @@ fig.update_layout(title_text="Phase 1")
 
 
 # %%
-fig = plot_rates_comparison(data_v3_1_p1, data_v3_2_p1, "CH3OH2+")
+fig = plot_rates_comparison(data_v3_1_p1, data_v3_2_p1, "H3+")
 fig.update_layout(
     height=1200,
 )
+[
+    fig.layout[f"yaxis{i+1 if i>0 else ''}"].update(tickformat=style)
+    for i, style in enumerate(["~e", "~e", "~%", "~%", "~%", "~%"])
+]
 fig.update_layout(title_text="Phase 1")
 
 
 # %%
-fig = plot_rates_comparison(data_v3_1_p2, data_v3_2_p2, "CH3OH2+")
+fig = plot_rates_comparison(data_v3_1_p1, data_v3_2_p1, "CO")
 fig.update_layout(
     height=1200,
 )
-fig.update_layout(title_text="Phase 2")
+[
+    fig.layout[f"yaxis{i+1 if i>0 else ''}"].update(tickformat=style)
+    for i, style in enumerate(["~e", "~e", "~%", "~%", "~%", "~%"])
+]
+fig.update_layout(title_text="Phase 1")
 
+
+# %% [markdown]
+# ## PHASE 2
 
 # %%
+fig = plot_rates_comparison(data_v3_1_p1, data_v3_2_p1, "CO")
+fig.update_layout(
+    height=1200,
+)
+[
+    fig.layout[f"yaxis{i+1 if i>0 else ''}"].update(tickformat=style)
+    for i, style in enumerate(["~e", "~e", "~%", "~%", "~%", "~%"])
+]
+fig.update_layout(title_text="Phase 1")
