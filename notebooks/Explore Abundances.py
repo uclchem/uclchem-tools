@@ -19,7 +19,7 @@ from glob import glob
 import uclchem
 import matplotlib.pyplot as plt
 
-from uclchem_tools import plot_densities
+from uclchem_tools import plot_abundances_comparison
 import plotly.graph_objects as go
 
 
@@ -190,7 +190,7 @@ render_button.on_click(on_change)
 # %%
 # display(container)
 # display(render_button)
-fig = plot_densities(
+fig = plot_abundances_comparison(
     dfs,
     [b.description for b in boxes],
     list(dfs.keys()),
@@ -200,7 +200,10 @@ fig = plot_densities(
 )
 names = [d.name for d in fig.data]
 species_to_plot = [
-    True if name in ["H2+", "H2", "CO", "H3+", "phase1", "phase2", "static"] else False
+    True
+    if name
+    in ["H2+", "H2", "CO", "H3+", "Collapsing Cloud", "Hot Core", "Static Cloud"]
+    else False
     for name in names
 ]
 # visible = [b.description for b in boxes if b.value]
@@ -218,6 +221,7 @@ fig.layout["xaxis1"].matches = "x1"
 fig.layout
 
 # %%
+fig.data
 
 # %%
 

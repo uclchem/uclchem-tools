@@ -14,8 +14,15 @@ custom_cycler = cycler(color=plt.get_cmap("tab10").colors) * cycler(
 )
 plt.rc("axes", prop_cycle=custom_cycler)
 
+#            ____  _    _ _   _ _____          _   _  _____ ______  _____
+#      /\   |  _ \| |  | | \ | |  __ \   /\   | \ | |/ ____|  ____|/ ____|
+#     /  \  | |_) | |  | |  \| | |  | | /  \  |  \| | |    | |__  | (___
+#    / /\ \ |  _ <| |  | | . ` | |  | |/ /\ \ | . ` | |    |  __|  \___ \
+#   / ____ \| |_) | |__| | |\  | |__| / ____ \| |\  | |____| |____ ____) |
+#  /_/    \_\____/ \____/|_| \_|_____/_/    \_\_| \_|\_____|______|_____/
 
-def plot_species(fig, df, species, col=1, row=1, grouptitle=None, **plot_kwargs):
+
+def _plot_abundance(fig, df, species, col=1, row=1, grouptitle=None, **plot_kwargs):
     """Plot the abundance of a list of species through time directly onto an axis.
 
     Args:
@@ -64,7 +71,7 @@ def plot_species(fig, df, species, col=1, row=1, grouptitle=None, **plot_kwargs)
     return fig
 
 
-def plot_densities(
+def plot_abundances_comparison(
     dfs,
     species_to_plot,
     runs_to_include,
@@ -73,28 +80,28 @@ def plot_densities(
     plot_temp=False,
     fig=None,
 ):
-    if not fig:
-        fig = make_subplots(
-            rows=len(runs_to_include) + 1 if plot_temp else 0,
-            cols=3,
-            # subplot_titles=("v3.1.0", "Production", "Destruction", "Samples"),
-            shared_xaxes="all",
-            vertical_spacing=0.03,
-        )
     model_names = {
         "phase1": "Collapsing Cloud",
         "phase2": "Hot Core",
         "static": "Static Cloud",
     }
-    model_data = {}
+    height = len(runs_to_include) + 1 if plot_temp else 0
+    width = len(model_names)
+
+    if not fig:
+        fig = make_subplots(
+            rows=height,
+            cols=width,
+            # subplot_titles=("v3.1.0", "Production", "Destruction", "Samples"),
+            shared_xaxes="all",
+            vertical_spacing=0.03,
+        )
+
     for idx_i, df_key in enumerate(runs_to_include):
         df = dfs[df_key]
-        print(df.keys())
-        for idx_j, model in enumerate(["phase1", "phase2", "static"]):
-            # axis = axes[idx_i, idx_j]
-            # axis.set_prop_cycle(cycler(color=plt.get_cmap("tab10").colors))
+        for idx_j, model in enumerate(model_names):
 
-            # Handle species that are not there.
+            # Handle creating a total ice abundance (bulk + surface).
             for spec in species_to_plot:
                 if spec not in list(df[model].columns):
                     if spec.startswith("$"):
@@ -107,8 +114,8 @@ def plot_densities(
                 print(
                     f"Testing element conservation for {df_key} in {model}: {uclchem.analysis.check_element_conservation(df[model])}"
                 )
-            # plot species and save to test.png, alternatively send dens instead of time.
-            fig = plot_species(
+            # Plot the lines
+            fig = _plot_abundance(
                 fig,
                 df[model],
                 species_to_plot,
@@ -121,22 +128,50 @@ def plot_densities(
                 fig.layout[
                     f"yaxis{idx_i*len(runs_to_include)+idx_j+1}"
                 ].matches = f"y{idx_j+1}"
+        # Only plot the temperature once at the end
 
-    # Only plot the temperature once at the end
-    if plot_temp:
-        for idx_j, model in enumerate(["phase1", "phase2", "static"]):
+    for idx_j, model in enumerate(model_names):
+        if plot_temp:
             fig.add_trace(
-                go.Scatter(x=df[model].index, y=df[model]["gasTemp"], name=model),
+                go.Scatter(
+                    x=df[model]["Time"].values,
+                    y=df[model]["gasTemp"].values,
+                    legendgroup="Temperatures",
+                    legendgrouptitle_text="Temperatures",
+                    name=model_names[model],
+                ),
                 col=idx_j + 1,
-                row=len(runs_to_include) + 1,
-                grouptitle="Temperatures",
-                name=model,
+                row=width,
             )
-    plot_temp = False
     fig.update_layout(legend=dict(groupclick="toggleitem"), hovermode="x unified")
-    fig.update_xaxes(type="log", tickformat="~e")
-    fig.update_yaxes(type="log")
+    fig.update_xaxes(type="log", exponentformat="power")
+    # Add time labels
+    xaxis_labels = ["Time (yr)"] * len(model_names)
+    [
+        fig.update_xaxes(title_text=label, row=height, col=i + 1)
+        for i, label in enumerate(xaxis_labels)
+    ]
+    yaxis_labels = ["Abundances (-)"] * len(runs_to_include) + ["Temperature (K)"]
+    [
+        fig.update_yaxes(title_text=label, row=i + 1, col=1)
+        for i, label in enumerate(yaxis_labels)
+    ]
+    # Add titles:
+    [
+        fig.update_yaxes(title=model_names[name], row=1, col=i + 1)
+        for i, name in enumerate(model_names)
+    ]
+    fig.update_yaxes(type="log", exponentformat="power")
     return fig
+
+
+#   _____         _______ ______  _____
+#  |  __ \     /\|__   __|  ____|/ ____|
+#  | |__) |   /  \  | |  | |__  | (___
+#  |  _  /   / /\ \ | |  |  __|  \___ \
+#  | | \ \  / ____ \| |  | |____ ____) |
+#  |_|  \_\/_/    \_\_|  |______|_____/
+#
 
 
 def plot_rates_comparison(data1, data2, specie):
@@ -163,6 +198,17 @@ def plot_rates_comparison(data1, data2, specie):
         fig.layout[f"yaxis{i+1 if i>0 else ''}"].update(tickformat=style)
         for i, style in enumerate(["~e", "~e", "~%", "~%", "~%", "~%"])
     ]
+    # Add time labels
+    xaxis_labels = ["Time (yr)"] * 2
+    [
+        fig.update_xaxes(title_text=label, row=3, col=i + 1)
+        for i, label in enumerate(xaxis_labels)
+    ]
+    yaxis_labels = [r"$\mathrm{Rates}\;(s^{-1})$", "Production", "Destruction"]
+    [
+        fig.update_yaxes(title_text=label, row=i + 1, col=1)
+        for i, label in enumerate(yaxis_labels)
+    ]
     return fig
 
 
@@ -176,7 +222,6 @@ def plot_rates(df, df_dest, df_prod, fig=None, col=1, linedict={}, groupname=Non
             shared_xaxes="all",
             vertical_spacing=0.03,
         )
-    print(groupname)
     # Plot the rates at which the species are produced and destroyed
     [
         fig.add_trace(
@@ -230,10 +275,16 @@ def plot_rates(df, df_dest, df_prod, fig=None, col=1, linedict={}, groupname=Non
 
     fig.update_layout(legend=dict(groupclick="toggleitem"), hovermode="x unified")
     fig.update_xaxes(type="log", tickformat="~e")
+    fig.update_xaxes(title_text="Time (yr)", row=3, col=1)
     fig.update_yaxes(type="log")
     # Scientific units for the rates, percentages for the contribution of the reactions.
     [
         fig.layout[f"yaxis{i+1 if i>0 else ''}"].update(tickformat=style)
         for i, style in enumerate(["~e", "~%", "~%"])
+    ]
+    yaxis_labels = [r"$\mathrm{Rates}\;(s^{-1})$", "Production", "Destruction"]
+    [
+        fig.update_yaxes(title_text=label, row=i + 1, col=1)
+        for i, label in enumerate(yaxis_labels)
     ]
     return fig
