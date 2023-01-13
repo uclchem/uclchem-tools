@@ -1,0 +1,20 @@
+outspecies:
+  - OCS
+  - CO
+  - CS
+  - CH3OH
+param_dict:
+  endAtFinalDensity: False
+  freefall: False
+  writeStep: 1
+  initialDens: 1e4
+  initialTemp: 10.0
+  finalDens: 1e5
+  finalTime: 5.0e6
+  outputFile: examples/test-output/static-full.dat
+  abundSaveFile: examples/test-output/startstatic.dat
+model:
+  cloud
+settings:
+  hdf_save: examples/test-output/test-store.h5
+  get_rates: true

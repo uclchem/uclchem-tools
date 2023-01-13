@@ -1,0 +1,24 @@
+outspecies:
+  - OCS
+  - CO
+  - CS
+  - CH3OH
+param_dict:
+  endAtFinalDensity: false
+  freefall: false
+  freezeFactor: 0.0
+  writeStep: 1
+  initialDens: 1e5
+  initialTemp: 10.0
+  finalDens: 1e5
+  finalTime: 5.0e6
+  outputFile: examples/test-output/static-full.dat
+  abundLoadFile: examples/test-output/startcollapse.dat
+  columnFile: examples/test-output/phase1-column.dat
+model:
+  hot_core:
+    temp_indx: 3
+    max_temp: 300.0
+settings:
+  hdf_save: examples/test-output/test-store.h5
+  get_rates: true
