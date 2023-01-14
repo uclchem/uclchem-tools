@@ -63,10 +63,12 @@ if __name__ == "__main__":
                 model_args = {}
             elif isinstance(config["model"], dict):
                 name = str(list(config["model"].keys())[0])
-                model_args = config["model"]
+                model_args = config["model"][name]
             # Obtain the model from uclchem
             model = get_model(name)
             # Run UCLCHEM
+            print(model.__doc__)
+            print(model_args)
             model(
                 param_dict=config["param_dict"],
                 out_species=config["outspecies"],

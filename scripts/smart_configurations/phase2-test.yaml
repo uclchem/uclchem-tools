@@ -18,7 +18,7 @@ param_dict:
 model:
   hot_core:
     temp_indx: 3
-    max_temp: 300.0
+    max_temperature: 300.0
 settings:
   hdf_save: examples/test-output/test-store.h5
   get_rates: true
