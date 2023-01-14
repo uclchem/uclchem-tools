@@ -7,10 +7,10 @@ param_dict:
   endAtFinalDensity: False
   freefall: False
   writeStep: 1
-  initialDens: 1e4
+  initialDens: 10_000
   initialTemp: 10.0
-  finalDens: 1e5
-  finalTime: 5.0e6
+  finalDens: 100_000
+  finalTime: 5_000_000
   outputFile: examples/test-output/static-full.dat
   abundSaveFile: examples/test-output/startstatic.dat
 model:
