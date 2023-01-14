@@ -67,11 +67,11 @@ if __name__ == "__main__":
             # Obtain the model from uclchem
             model = get_model(name)
             # Run UCLCHEM
-            # model(
-            #     param_dict=config["param_dict"],
-            #     out_species=config["outspecies"],
-            #     **model_args,
-            # )
+            model(
+                param_dict=config["param_dict"],
+                out_species=config["outspecies"],
+                **model_args,
+            )
             # CONVERT (csv -> hdf)
             csvpath = config["param_dict"]["outputFile"]
             datakey = pathlib.Path(csvpath).stem
@@ -98,9 +98,9 @@ if __name__ == "__main__":
                     df_rates, df_production, df_destruction = rates_to_dfs(
                         rates_dict, specie
                     )
-                    store.put("{datakey}/{specie}/total_rates", df_rates)
-                    store.put("{datakey}/{specie}/production)", df_production)
-                    store.put("{datakey}/{specie}/df_destruction", df_destruction)
+                    store.put(f"{datakey}/{specie}/total_rates", df_rates)
+                    store.put(f"{datakey}/{specie}/production)", df_production)
+                    store.put(f"{datakey}/{specie}/df_destruction", df_destruction)
     else:
         logging.warning(
             "No UCLCHEM could be found and no virtualenv with uclchem was specified. Not running any code."
