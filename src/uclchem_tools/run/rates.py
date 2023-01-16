@@ -122,7 +122,10 @@ def get_rates_of_change(result_df, species, reactions, rate_threshold=0.99):
         result_file (str): The path to the file containing the UCLCHEM output
         rate_threshold (float,optional): Analysis output will contain the only the most efficient reactions that are responsible for rate_threshold of the total production and destruction rate. Defaults to 0.99.
     """
-    species = list(species["Name"])
+    if "Name" in species:
+        species = list(species["Name"])
+    elif "NAME" in species:
+        species = list(species["NAME"])
     reactions = reactions[
         [
             "Reactant 1",

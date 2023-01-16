@@ -1,7 +1,0 @@
-run: True
-venvpath : "/data2/vermarien/uclchem-dev/v3.1.0/.venv"
-uclchemdir : "/data2/vermarien/uclchem-dev/v3.1.0/"
-outputdir : "/data2/vermarien/uclchem-dev/v3.1.0/examples/test-output"
-hdf5root : "output_files"
-runname : "v3.1.0"
-comment: "Version without any adjustments v3.1.0 at checkout 08d37f8c3063f8ff8a9a7aa16d9eff0ed4f99538"

@@ -12,13 +12,13 @@ param_dict:
   initialTemp: 10.0
   finalDens: 100_000
   finalTime: 5_000_000
-  outputFile: examples/test-output/phase2Full.dat
-  abundLoadFile: examples/test-output/startCollapse.dat
-  columnFile: examples/test-output/phase2Column.dat
+  outputFile: examples/test/phase2Full.dat
+  abundLoadFile: examples/test/startCollapse.dat
+  columnFile: examples/test/phase2Column.dat
 model:
   hot_core:
     temp_indx: 3
     max_temperature: 300.0
 settings:
-  hdf_save: examples/test-output/test-store.h5
+  hdf_save: examples/test/test-store.h5
   get_rates: true

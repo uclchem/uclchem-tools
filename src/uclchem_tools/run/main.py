@@ -3,6 +3,8 @@ import subprocess
 import pathlib
 import yaml
 import logging
+import warnings
+from tables import NaturalNameWarning
 import pandas as pd
 from importlib.metadata import version
 
@@ -30,7 +32,7 @@ def get_model(name):
 def get_parser():
     parser = ArgumentParser(description="info", formatter_class=RawTextHelpFormatter)
     parser.add_argument(
-        "configpaths", nargs="+", help="A (list of) configuration file(s)"
+        "configpaths", nargs="+", help="A (list of) configuration file(s)", type=str
     )
     parser.add_argument(
         "--venvpath",
@@ -45,7 +47,7 @@ if __name__ == "__main__":
     if args.venvpath:
         logging.info(f"Running with virtual environment at {args.venvpath}")
         subprocess.run(
-            f"{pathlib.Path(args.venvpath)/'bin/python'} {pathlib.Path(__file__).resolve()} {args.configpaths}",
+            f"{pathlib.Path(args.venvpath)/'bin/python'} {pathlib.Path(__file__).resolve()} {' '.join(args.configpaths)}",
             shell=True,
         )
     elif UCLCHEM_AVAIL:
@@ -67,8 +69,6 @@ if __name__ == "__main__":
             # Obtain the model from uclchem
             model = get_model(name)
             # Run UCLCHEM
-            print(model.__doc__)
-            print(model_args)
             model(
                 param_dict=config["param_dict"],
                 out_species=config["outspecies"],
@@ -83,26 +83,33 @@ if __name__ == "__main__":
                 hdfpath = config["settings"]["hdf_save"]
             else:
                 hdfpath = False
-            print(hdfpath)
-            with pd.HDFStore(hdfpath, complevel=9, complib="zlib") as store:
-                df = uclchem.analysis.read_output_file(csvpath)
-                store.put(datakey + "/abundances", df)
-                print(config)
-                store.get_storer(datakey + "/abundances").attrs.metadata = config
-                # Add reactions and species from current UCLCHEM install
-                reactions = uclchem.utils.get_reaction_table()
-                species = uclchem.utils.get_species_table()
-                store.put(datakey + "/reactions", reactions)
-                store.put(datakey + "/species", species)
-                # POSTPROCESS UCLCHEM obtain the rates
-                rates_dict = get_rates_of_change(df, species, reactions)
-                for specie in list(species["Name"]):
-                    df_rates, df_production, df_destruction = rates_to_dfs(
-                        rates_dict, specie
-                    )
-                    store.put(f"{datakey}/rates/total_rates/{specie}", df_rates)
-                    store.put(f"{datakey}/rates/production/{specie}", df_production)
-                    store.put(f"{datakey}/rates/destruction/{specie}", df_destruction)
+            # print(hdfpath)
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=NaturalNameWarning)
+                with pd.HDFStore(hdfpath, complevel=9, complib="zlib") as store:
+                    df = uclchem.analysis.read_output_file(csvpath)
+                    store.put(datakey + "/abundances", df)
+                    store.get_storer(datakey + "/abundances").attrs.metadata = config
+                    # Add reactions and species from current UCLCHEM install
+                    reactions = uclchem.utils.get_reaction_table()
+                    species = uclchem.utils.get_species_table()
+                    store.put(datakey + "/reactions", reactions)
+                    store.put(datakey + "/species", species)
+                    # POSTPROCESS UCLCHEM obtain the rates
+                    rates_dict = get_rates_of_change(df, species, reactions)
+                    if "Name" in species:
+                        names = list(species["Name"])
+                    elif "NAME" in species:
+                        names = list(species["NAME"])
+                    for specie in names:
+                        df_rates, df_production, df_destruction = rates_to_dfs(
+                            rates_dict, specie
+                        )
+                        store.put(f"{datakey}/rates/total_rates/{specie}", df_rates)
+                        store.put(f"{datakey}/rates/production/{specie}", df_production)
+                        store.put(
+                            f"{datakey}/rates/destruction/{specie}", df_destruction
+                        )
     else:
         logging.warning(
             "No UCLCHEM could be found and no virtualenv with uclchem was specified. Not running any code."

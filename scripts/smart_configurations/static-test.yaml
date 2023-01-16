@@ -11,10 +11,10 @@ param_dict:
   initialTemp: 10.0
   finalDens: 100_000
   finalTime: 5_000_000
-  outputFile: examples/test-output/staticFull.dat
-  abundSaveFile: examples/test-output/startStatic.dat
+  outputFile: examples/test/staticFull.dat
+  abundSaveFile: examples/test/startStatic.dat
 model:
   cloud
 settings:
-  hdf_save: examples/test-output/test-store.h5
+  hdf_save: examples/test/test-store.h5
   get_rates: true

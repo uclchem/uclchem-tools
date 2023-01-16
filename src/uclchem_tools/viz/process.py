@@ -4,46 +4,54 @@ from cycler import cycler
 from copy import deepcopy
 
 
+# def process_data(data, specie, mode="plotly"):
+#     key_destruction_reactions = {}
+#     key_production_reactions = {}
+#     data_copy = deepcopy(data[specie])
+#     for time_key in data_copy:
+#         key_destruction_reactions[time_key] = data_copy[time_key].pop(
+#             "key_destruction_reactions"
+#         )
+#         key_production_reactions[time_key] = data_copy[time_key].pop(
+#             "key_production_reactions"
+#         )
+#     df = pd.DataFrame.from_dict(data_copy).transpose()
+#     df.set_index("time", inplace=True)
+#     df.index.set_names("Time", inplace=True)
+#     df["total_destruction"] *= -1  # make destruction positive so we can plot it.
+#     df_dest = pd.DataFrame.from_dict(key_destruction_reactions).transpose()
+#     df_dest.index.set_names(["Time"], inplace=True)
+#     df_prod = pd.DataFrame.from_dict(key_production_reactions).transpose()
+#     df_prod.index.set_names(["Time"], inplace=True)
+
+#     if mode == "matplotlib":
+#         df_dest.columns = [
+#             name.replace(f"{specie} ", r" $\bf{" + str(specie) + "}$ ")
+#             for name in df_dest.columns
+#         ]
+#         df_prod.columns = [
+#             name.replace(f"{specie} ", r" $\bf{" + str(specie) + "}$ ")
+#             for name in df_prod.columns
+#         ]
+#     elif mode == "plotly":
+#         df_dest.columns = [
+#             name.replace(f"{specie} ", r"<b>" + str(specie) + "</b>")
+#             for name in df_dest.columns
+#         ]
+#         df_prod.columns = [
+#             name.replace(f"{specie} ", r"<b>" + str(specie) + "</b>")
+#             for name in df_prod.columns
+#         ]
+
+#     return {"df": df, "df_dest": df_dest, "df_prod": df_prod}
+
+
 def process_data(data, specie, mode="plotly"):
-    key_destruction_reactions = {}
-    key_production_reactions = {}
-    data_copy = deepcopy(data[specie])
-    for time_key in data_copy:
-        key_destruction_reactions[time_key] = data_copy[time_key].pop(
-            "key_destruction_reactions"
-        )
-        key_production_reactions[time_key] = data_copy[time_key].pop(
-            "key_production_reactions"
-        )
-    df = pd.DataFrame.from_dict(data_copy).transpose()
-    df.set_index("time", inplace=True)
-    df.index.set_names("Time", inplace=True)
-    df["total_destruction"] *= -1  # make destruction positive so we can plot it.
-    df_dest = pd.DataFrame.from_dict(key_destruction_reactions).transpose()
-    df_dest.index.set_names(["Time"], inplace=True)
-    df_prod = pd.DataFrame.from_dict(key_production_reactions).transpose()
-    df_prod.index.set_names(["Time"], inplace=True)
-
-    if mode == "matplotlib":
-        df_dest.columns = [
-            name.replace(f"{specie} ", r" $\bf{" + str(specie) + "}$ ")
-            for name in df_dest.columns
-        ]
-        df_prod.columns = [
-            name.replace(f"{specie} ", r" $\bf{" + str(specie) + "}$ ")
-            for name in df_prod.columns
-        ]
-    elif mode == "plotly":
-        df_dest.columns = [
-            name.replace(f"{specie} ", r"<b>" + str(specie) + "</b>")
-            for name in df_dest.columns
-        ]
-        df_prod.columns = [
-            name.replace(f"{specie} ", r"<b>" + str(specie) + "</b>")
-            for name in df_prod.columns
-        ]
-
-    return {"df": df, "df_dest": df_dest, "df_prod": df_prod}
+    return {
+        "df": data["total_rates"][specie],
+        "df_dest": data["destruction"][specie],
+        "df_prod": data["production"][specie],
+    }
 
 
 def sort_reaction_df(df, reference_df, common_dict):

@@ -11,11 +11,11 @@ param_dict:
   initialTemp: 10.0
   finalDens: 100000.0
   finalTime: 5000000.0
-  outputFile: examples/test-output/phase1Full.dat
-  abundSaveFile: examples/test-output/startCollapse.dat
-  columnFile: examples/test-output/phase1Column.dat
+  outputFile: examples/test/phase1Full.dat
+  abundSaveFile: examples/test/startCollapse.dat
+  columnFile: examples/test/phase1Column.dat
 model:
   cloud
 settings:
-  hdf_save: examples/test-output/test-store.h5
+  hdf_save: examples/test/test-store.h5
   get_rates: true

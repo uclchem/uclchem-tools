@@ -165,6 +165,96 @@ def plot_abundances_comparison(
     return fig
 
 
+def plot_abundances_comparison2(
+    dfs,
+    species_to_plot,
+    reference_run=None,
+    verbose=False,
+    plot_temp=False,
+    fig=None,
+):
+    model_names = {
+        "phase1": "Collapsing Cloud",
+        # "phase2": "Hot Core",
+        # "static": "Static Cloud",
+    }
+    height = len(dfs) + 1 if plot_temp else 0
+    width = 1
+
+    if not fig:
+        fig = make_subplots(
+            rows=height,
+            cols=width,
+            # subplot_titles=("v3.1.0", "Production", "Destruction", "Samples"),
+            shared_xaxes="all",
+            vertical_spacing=0.03,
+        )
+
+    for idx_i, df in enumerate(dfs):
+        # Handle creating a total ice abundance (bulk + surface).
+        for spec in species_to_plot:
+            if spec not in list(df.columns):
+                if spec.startswith("$"):
+                    if not spec.replace("$", "#") in df:
+                        df[spec.replace("$", "#")] = 1.0e-30
+                    if not spec.replace("$", "@") in df:
+                        df[spec.replace("$", "@")] = 1.0e-30
+
+        if verbose:
+            # print(
+            #     f"Testing element conservation for {df_key} in {model}: {uclchem.analysis.check_element_conservation(df)}"
+            # )
+            pass
+        # Plot the lines
+        fig = _plot_abundance(
+            fig,
+            df,
+            species_to_plot,
+            row=idx_i + 1,
+            col=1,
+            grouptitle=f"{idx_i}",
+        )
+        # If we are in lower rows, fix the y-axis so they are identical for all rows but temperature
+        # if idx_i > 0:
+        #     fig.layout[
+        #         f"yaxis{idx_i*len(runs_to_include)+idx_j+1}"
+        #     ].matches = f"y{idx_j+1}"
+    # Only plot the temperature once at the end
+
+    if plot_temp:
+        fig.add_trace(
+            go.Scatter(
+                x=df["Time"].values,
+                y=df["gasTemp"].values,
+                legendgroup="Temperatures",
+                legendgrouptitle_text="Temperatures",
+                name="Temperature",
+            ),
+            col=1,
+            row=3,
+        )
+    fig.update_layout(legend=dict(groupclick="toggleitem"), hovermode="x unified")
+    fig.update_xaxes(type="log", exponentformat="power")
+    # Add time labels
+    xaxis_labels = ["Time (yr)"] * len(model_names)
+    [
+        fig.update_xaxes(title_text=label, row=height, col=i + 1)
+        for i, label in enumerate(xaxis_labels)
+    ]
+    yaxis_labels = ["Abundances (-)"] * 2 + ["Temperature (K)"]
+    [
+        fig.update_yaxes(title_text=label, row=i + 1, col=1)
+        for i, label in enumerate(yaxis_labels)
+    ]
+    # Add titles:
+    [
+        fig.update_yaxes(title=model_names[name], row=1, col=i + 1)
+        for i, name in enumerate(model_names)
+    ]
+    fig.update_yaxes(type="log", exponentformat="power")
+    return fig
+
+
 #   _____         _______ ______  _____
 #  |  __ \     /\|__   __|  ____|/ ____|
 #  | |__) |   /  \  | |  | |__  | (___
