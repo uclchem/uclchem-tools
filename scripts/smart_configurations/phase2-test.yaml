@@ -12,9 +12,9 @@ param_dict:
   initialTemp: 10.0
   finalDens: 100_000
   finalTime: 5_000_000
-  outputFile: examples/test-output/static-full.dat
-  abundLoadFile: examples/test-output/startcollapse.dat
-  columnFile: examples/test-output/phase1-column.dat
+  outputFile: examples/test-output/phase2Full.dat
+  abundLoadFile: examples/test-output/startCollapse.dat
+  columnFile: examples/test-output/phase2Column.dat
 model:
   hot_core:
     temp_indx: 3

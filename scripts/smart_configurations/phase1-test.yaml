@@ -11,9 +11,9 @@ param_dict:
   initialTemp: 10.0
   finalDens: 100000.0
   finalTime: 5000000.0
-  outputFile: examples/test-output/static-full.dat
-  abundSaveFile: examples/test-output/startcollapse.dat
-  columnFile: examples/test-output/phase1-column.dat
+  outputFile: examples/test-output/phase1Full.dat
+  abundSaveFile: examples/test-output/startCollapse.dat
+  columnFile: examples/test-output/phase1Column.dat
 model:
   cloud
 settings:

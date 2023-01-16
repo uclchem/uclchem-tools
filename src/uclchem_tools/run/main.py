@@ -84,7 +84,7 @@ if __name__ == "__main__":
             else:
                 hdfpath = False
             print(hdfpath)
-            with pd.HDFStore(hdfpath) as store:
+            with pd.HDFStore(hdfpath, complevel=9, complib="zlib") as store:
                 df = uclchem.analysis.read_output_file(csvpath)
                 store.put(datakey + "/abundances", df)
                 print(config)
@@ -100,9 +100,9 @@ if __name__ == "__main__":
                     df_rates, df_production, df_destruction = rates_to_dfs(
                         rates_dict, specie
                     )
-                    store.put(f"{datakey}/{specie}/total_rates", df_rates)
-                    store.put(f"{datakey}/{specie}/production)", df_production)
-                    store.put(f"{datakey}/{specie}/df_destruction", df_destruction)
+                    store.put(f"{datakey}/rates/total_rates/{specie}", df_rates)
+                    store.put(f"{datakey}/rates/production/{specie}", df_production)
+                    store.put(f"{datakey}/rates/destruction/{specie}", df_destruction)
     else:
         logging.warning(
             "No UCLCHEM could be found and no virtualenv with uclchem was specified. Not running any code."

@@ -11,8 +11,8 @@ param_dict:
   initialTemp: 10.0
   finalDens: 100_000
   finalTime: 5_000_000
-  outputFile: examples/test-output/static-full.dat
-  abundSaveFile: examples/test-output/startstatic.dat
+  outputFile: examples/test-output/staticFull.dat
+  abundSaveFile: examples/test-output/startStatic.dat
 model:
   cloud
 settings:
