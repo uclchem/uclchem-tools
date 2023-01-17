@@ -20,4 +20,5 @@ from .viz.plot import (
     plot_rates_comparison,
     plot_rates,
     plot_abundances_comparison2,
+    plot_rates_and_abundances_comparison,
 )

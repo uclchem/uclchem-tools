@@ -9,6 +9,7 @@ from uclchem_tools import (
     plot_rates_comparison,
     plot_abundances_comparison,
     plot_abundances_comparison2,
+    plot_rates_and_abundances_comparison,
 )
 from uclchem_tools.viz.process import process_data
 
@@ -96,7 +97,6 @@ def get_unique_elements(data_dict):
         for data_keys in df:
             all_elements.append(df[data_keys]["abundances"].columns.values)
     all_elements = list(np.unique(np.concatenate(all_elements)))
-    print(all_elements)
     for spec in all_elements:
         if spec.startswith("#") and spec.replace("#", "$") not in all_elements:
             all_elements.append(spec.replace("#", "$"))
@@ -122,7 +122,7 @@ def get_unique_elements(data_dict):
 
 
 def get_fig0(names_to_display):
-    names_to_display += ["Collapsing Cloud", "Hot Core", "Static Cloud"]
+    # names_to_display += ["Collapsing Cloud", "Hot Core", "Static Cloud"]
     fig = plot_abundances_comparison(
         df_dict,
         names_to_display,
@@ -135,6 +135,20 @@ def get_fig0(names_to_display):
     return fig
 
 
+def get_fig1(abundance_species, specie):
+    fig1 = plot_rates_and_abundances_comparison(
+        data[0]["phase1Full"],
+        data[1]["phase1Full"],
+        abundance_species,
+        specie,
+    )
+    fig1.update_layout(title_text="Phase 1")
+    fig1.update_layout(
+        height=1200,
+    )
+    return fig1
+
+
 if __name__ == "__main__":
     # Data loading part:
     paths = ["comparison/v3.1/test-store.h5", "comparison/v3.2/test-store.h5"]
@@ -145,27 +159,41 @@ if __name__ == "__main__":
     names_to_display = ["H", "H2", "$H", "H2O", "$H2O", "CO", "$CO", "$CH3OH", "CH3OH"]
     fig = get_fig0(names_to_display)
     # names = [d.name for d in fig.data]
-    figdropdown = dcc.Dropdown(
+    dd1 = dcc.Dropdown(
         options=all_keys,
         value=names_to_display,
-        id="my-multi-dynamic-dropdown",
+        id="dd1",
         multi=True,
     )
     # refresh_fig(fig, names, names_to_display=names_to_display)
     fig.update_layout(
         height=1200,
     )
-    button = html.Div(
+    b1 = html.Div(
         [
-            dbc.Button("Refresh", id="example-button", className="me-2", n_clicks=0),
+            dbc.Button("Refresh", id="button1", n_clicks=0),
             html.Span(id="example-output", style={"verticalAlign": "middle"}),
         ]
     )
+    fig1 = get_fig1(names_to_display, "H2O")
 
-    fig1 = plot_rates_comparison(
-        data[0]["phase1Full"]["rates"], data[1]["phase1Full"]["rates"], "CH3OH"
+    dd2 = dcc.Dropdown(
+        options=all_keys,
+        value="H2O",
+        id="dd2",
     )
-    fig1.update_layout(title_text="Phase 1")
+    dd3 = dcc.Dropdown(
+        options=all_keys,
+        value=names_to_display,
+        id="dd3",
+        multi=True,
+    )
+    b2 = html.Div(
+        [
+            dbc.Button("Refresh", id="button2", n_clicks=0),
+            html.Span(id="example-output", style={"verticalAlign": "middle"}),
+        ]
+    )
 
     fig2 = plot_abundances_comparison2(
         [data[0]["phase1Full"]["abundances"], data[1]["phase1Full"]["abundances"]],
@@ -174,13 +202,27 @@ if __name__ == "__main__":
     )
     fig2.update_layout(title_text="Phase 1")
 
-    # Dash things:
-    app = Dash(__name__, external_stylesheets=[dbc.themes.LUX])
+    dd4 = dcc.Dropdown(
+        options=all_keys,
+        value=names_to_display,
+        id="dd4",
+        multi=True,
+    )
 
+    # Dash things:
+    app = Dash(
+        __name__,
+        external_stylesheets=[dbc.themes.LUX],
+        suppress_callback_exceptions=True,
+    )
+
+    #
+    # TAB 1
+    #
     @app.callback(
-        Output("my-multi-dynamic-dropdown", "options"),
-        Input("my-multi-dynamic-dropdown", "search_value"),
-        State("my-multi-dynamic-dropdown", "value"),
+        Output("dd1", "options"),
+        Input("dd1", "search_value"),
+        State("dd1", "value"),
     )
     def update_multi_options(search_value, value):
         if not search_value:
@@ -192,13 +234,64 @@ if __name__ == "__main__":
     @app.callback(
         Output("graph-1-tabs-dcc", "figure"),
         [
-            Input("example-button", "n_clicks"),
-            State("my-multi-dynamic-dropdown", "value"),
+            Input("button1", "n_clicks"),
+            State("dd1", "value"),
         ],
     )
     def on_button_click(n, selected_species):
         fig = get_fig0(selected_species)
         return fig
+
+    #
+    # TAB 2
+    #
+
+    @app.callback(Output("dd2", "options"), Input("dd2", "search_value"))
+    def update_options(search_value):
+        if not search_value:
+            raise PreventUpdate
+        return [o for o in all_keys if search_value in o]
+
+    @app.callback(
+        Output("dd3", "options"),
+        Input("dd3", "search_value"),
+        State("dd3", "value"),
+    )
+    def update_multi_options(search_value, value):
+        if not search_value:
+            raise PreventUpdate
+        # Make sure that the set values are in the option list, else they will disappear
+        # from the shown select list, but still part of the `value`.
+        return [o for o in all_keys if search_value in o or o in (value or [])]
+
+    @app.callback(
+        Output("graph-2-tabs-dcc", "figure"),
+        [Input("button2", "n_clicks"), State("dd2", "value"), State("dd3", "value")],
+    )
+    def on_button_click(n, selected_specie, abundance_species):
+        fig = get_fig1(abundance_species, selected_specie)
+        return fig
+
+    #
+    # TAB 3
+    #
+    # @app.callback(
+    #     Output("dd3", "options"),
+    #     Input("dd3", "search_value"),
+    #     State("dd3", "value"),
+    # )
+    # def update_multi_options(search_value, value):
+    #     if not search_value:
+    #         raise PreventUpdate
+    #     # Make sure that the set values are in the option list, else they will disappear
+    #     # from the shown select list, but still part of the `value`.
+    #     return [o for o in all_keys if search_value in o or o in (value or [])]
+
+    # @app.callback(Output("dd4", "options"), Input("dd4", "search_value"))
+    # def update_options(search_value):
+    #     if not search_value:
+    #         raise PreventUpdate
+    #     return [o for o in all_keys if search_value in o]
 
     app.layout = html.Div(
         [
@@ -226,8 +319,8 @@ if __name__ == "__main__":
                 [
                     html.H3("Comparing abundances"),
                     dcc.Graph(figure=fig, id="graph-1-tabs-dcc"),
-                    figdropdown,
-                    button,
+                    dd1,
+                    b1,
                 ]
             )
         elif tab == "tab-2-example-graph":
@@ -238,16 +331,20 @@ if __name__ == "__main__":
                         id="graph-2-tabs-dcc",
                         figure=fig1,
                     ),
+                    dd2,
+                    dd3,
+                    b2,
                 ]
             )
         elif tab == "tab-3-example-graph":
             return html.Div(
                 [
-                    html.H3("In depth rate exploration"),
-                    dcc.Graph(
-                        id="graph-3-tabs-dcc",
-                        figure=fig2,
-                    ),
+                    html.H3("In depth rate exploration: under construction"),
+                    html.Div(children=(html.Div(), html.Div()))
+                    # dcc.Graph(
+                    #     id="graph-3-tabs-dcc",
+                    #     figure=fig2,
+                    # ),
                 ]
             )
 

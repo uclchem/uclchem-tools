@@ -34,23 +34,25 @@ def _plot_abundance(fig, df, species, col=1, row=1, grouptitle=None, **plot_kwar
         pyplot.axis: Modified input axis is returned
     """
 
-    color_palette(n_colors=len(species))
+    # color_palette(n_colors=len(species))
     for specIndx, specName in enumerate(species):
         linestyle = "solid"
         if specName in df:
-            if specName[0] == "$" and specName.replace("$", "#") in list(df.columns):
+            if specName[0] == "#":
+                linestyle = "dash"
+            elif specName[0] == "@":
+                linestyle = "dot"
+            abundances = df[specName]
+        else:
+            if specName.startswith("$") and specName.replace("$", "#") in list(
+                df.columns
+            ):
                 abundances = df[specName.replace("$", "#")]
                 linestyle = "dashdot"
                 if specName.replace("$", "@") in df.columns:
                     abundances = abundances + df[specName.replace("$", "@")]
             else:
-                if specName[0] == "#":
-                    linestyle = "dash"
-                elif specName[0] == "@":
-                    linestyle = "dot"
-                abundances = df[specName]
-        else:
-            abundances = np.full(df.index.shape, np.nan)
+                abundances = np.full(df.index.shape, np.nan)
 
         if abundances.all() == 1e-30:
             addendum = " (np)"
@@ -93,7 +95,7 @@ def plot_abundances_comparison(
         fig = make_subplots(
             rows=height,
             cols=width,
-            # subplot_titles=("v3.1.0", "Production", "Destruction", "Samples"),
+            subplot_titles=list(model_names.values()),
             shared_xaxes="all",
             vertical_spacing=0.03,
         )
@@ -158,10 +160,10 @@ def plot_abundances_comparison(
         for i, label in enumerate(yaxis_labels)
     ]
     # Add titles:
-    [
-        fig.update_yaxes(title=model_names[name], row=1, col=i + 1)
-        for i, name in enumerate(model_names)
-    ]
+    # [
+    #     fig.update_title(title=model_names[name], row=1, col=i + 1)
+    #     for i, name in enumerate(model_names)
+    # ]
     fig.update_yaxes(type="log", exponentformat="power")
     return fig
 
@@ -374,6 +376,60 @@ def plot_rates(df, df_dest, df_prod, fig=None, col=1, linedict={}, groupname=Non
         for i, style in enumerate(["~e", "~%", "~%"])
     ]
     yaxis_labels = [r"$\mathrm{Rates}\;(s^{-1})$", "Production", "Destruction"]
+    [
+        fig.update_yaxes(title_text=label, row=i + 1, col=1)
+        for i, label in enumerate(yaxis_labels)
+    ]
+    return fig
+
+
+def plot_rates_and_abundances_comparison(
+    data1, data2, abundance_species, rates_species
+):
+    print(f"Abundances: {abundance_species}, rates: {rates_species}")
+    fig = make_subplots(
+        rows=4,
+        cols=2,
+        row_heights=[1, 1, 1, 1],
+        subplot_titles=["v3.1.0", "v3.1.0-dev"]
+        + ["Production"] * 2
+        + ["Destruction"] * 2
+        + ["Abundances"] * 2,
+        shared_xaxes="all",
+        vertical_spacing=0.03,
+    )
+    d1 = process_data(data1["rates"], rates_species)
+    d2 = process_data(data2["rates"], rates_species)
+    # Make sure that the
+    d1, d2 = sort_by_intersection(d1, d2, "df_dest")
+    d1, d2 = sort_by_intersection(d1, d2, "df_prod")
+    plot_rates(**d1, fig=fig, col=1, groupname="left")
+    plot_rates(**d2, fig=fig, col=2, linedict=dict(dash="dash"), groupname="right")
+
+    _plot_abundance(
+        fig, data1["abundances"], abundance_species, col=1, row=4, grouptitle="left"
+    )
+    _plot_abundance(
+        fig, data2["abundances"], abundance_species, col=2, row=4, grouptitle="right"
+    )
+    fig.layout["xaxis2"].matches = "x1"
+    # Fix the formatting of the numbers on the axes
+    [
+        fig.layout[f"yaxis{i+1 if i>0 else ''}"].update(tickformat=style)
+        for i, style in enumerate(["~e", "~e", "~%", "~%", "~%", "~%", "~e", "~e"])
+    ]
+    # Add time labels
+    xaxis_labels = ["Time (yr)"] * 2
+    [
+        fig.update_xaxes(title_text=label, row=4, col=i + 1)
+        for i, label in enumerate(xaxis_labels)
+    ]
+    yaxis_labels = [
+        r"$\mathrm{Rates}\;(s^{-1})$",
+        "Production",
+        "Destruction",
+        "Abundances",
+    ]
     [
         fig.update_yaxes(title_text=label, row=i + 1, col=1)
         for i, label in enumerate(yaxis_labels)
