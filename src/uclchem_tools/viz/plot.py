@@ -80,10 +80,11 @@ def plot_abundances_comparison(
     plot_temp=False,
     fig=None,
 ):
+    print(species_to_plot)
     model_names = {
-        "phase1": "Collapsing Cloud",
-        "phase2": "Hot Core",
-        "static": "Static Cloud",
+        "phase1Full": "Collapsing Cloud",
+        "phase2Full": "Hot Core",
+        "staticFull": "Static Cloud",
     }
     height = len(runs_to_include) + 1 if plot_temp else 0
     width = len(model_names)
@@ -103,21 +104,21 @@ def plot_abundances_comparison(
 
             # Handle creating a total ice abundance (bulk + surface).
             for spec in species_to_plot:
-                if spec not in list(df[model].columns):
+                if spec not in list(df[model]["abundances"].columns):
                     if spec.startswith("$"):
-                        if not spec.replace("$", "#") in df[model]:
-                            df[model][spec.replace("$", "#")] = 1.0e-30
-                        if not spec.replace("$", "@") in df[model]:
-                            df[model][spec.replace("$", "@")] = 1.0e-30
+                        if not spec.replace("$", "#") in df[model]["abundances"]:
+                            df[model]["abundances"][spec.replace("$", "#")] = 1.0e-30
+                        if not spec.replace("$", "@") in df[model]["abundances"]:
+                            df[model]["abundances"][spec.replace("$", "@")] = 1.0e-30
 
             if verbose:
                 print(
-                    f"Testing element conservation for {df_key} in {model}: {uclchem.analysis.check_element_conservation(df[model])}"
+                    f"Testing element conservation for {df_key} in {model}: {uclchem.analysis.check_element_conservation(df[model]['abundances'])}"
                 )
             # Plot the lines
             fig = _plot_abundance(
                 fig,
-                df[model],
+                df[model]["abundances"],
                 species_to_plot,
                 row=idx_i + 1,
                 col=idx_j + 1,
@@ -134,8 +135,8 @@ def plot_abundances_comparison(
         if plot_temp:
             fig.add_trace(
                 go.Scatter(
-                    x=df[model]["Time"].values,
-                    y=df[model]["gasTemp"].values,
+                    x=df[model]["abundances"]["Time"].values,
+                    y=df[model]["abundances"]["gasTemp"].values,
                     legendgroup="Temperatures",
                     legendgrouptitle_text="Temperatures",
                     name=model_names[model],
@@ -174,9 +175,9 @@ def plot_abundances_comparison2(
     fig=None,
 ):
     model_names = {
-        "phase1": "Collapsing Cloud",
-        # "phase2": "Hot Core",
-        # "static": "Static Cloud",
+        "phase1Full": "Collapsing Cloud",
+        "phase2Full": "Hot Core",
+        "staticFull": "Static Cloud",
     }
     height = len(dfs) + 1 if plot_temp else 0
     width = 1
