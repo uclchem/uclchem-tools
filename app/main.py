@@ -14,7 +14,40 @@ def analyze_rates(data, specie):
     return plot_rates(**d1)
 
 
+class lazy_df_dict:
+    def __init__(
+        self,
+        h5root,
+        key,
+        walker,
+    ):
+        self.h5root = h5root
+        self.key = key
+        self.walker = walker
+        self.values_dict = {}
+
+    def __getitem__(self, key):
+        print("Being lazy", key, type(self.values_dict[key]))
+        print(self.values_dict.keys())
+        if not isinstance(self.values_dict[key], pd.DataFrame):
+            with pd.HDFStore(self.h5root, complevel=9, complib="zlib") as store:
+                self.values_dict[key] = store.get(f"{self.walker}/{key}")
+        print("After being non-lazy", key, type(self.values_dict[key]))
+        return self.values_dict[key]
+
+    def __setitem__(self, key, value):
+        self.values_dict[key] = value
+
+    def keys(self):
+        return self.values_dict.keys()
+
+    def values(self):
+        return self.values_dict.values()
+
+
 def load_data(h5root):
+    # Lazy loading non-leaves gives weird behaviour.
+    lazy_level = 2
     with pd.HDFStore(h5root, complevel=9, complib="zlib") as store:
         read_dict = {}
         for walker in tqdm(store.walk("/")):
@@ -28,10 +61,20 @@ def load_data(h5root):
                     access_read_dict = access_read_dict[key]
             # Create the children of the node
             for key in walker[1]:
-                access_read_dict[key] = {}
+                # Only lazy load the deeper datasets (since there are many!)
+                if len(dict_path) >= lazy_level:
+                    access_read_dict[key] = lazy_df_dict(
+                        h5root, key, f"{walker[0]}/{key}"
+                    )
+                else:
+                    access_read_dict[key] = {}
             # Create the leaf nodes, which are dataframes.
             for key in walker[2]:
-                access_read_dict[key] = store.get(f"{walker[0]}/{key}")
+                if len(dict_path) >= lazy_level:
+                    access_read_dict[key] = f"{walker[0]}/{key}"
+                else:
+                    access_read_dict[key] = store.get(f"{walker[0]}/{key}")
+
             # print(f"root: {walker[0]}, keys: {walker[1]}, datasets: {walker[2]}" )
     return read_dict
 
@@ -51,6 +94,7 @@ if __name__ == "__main__":
     # ) as fh:
     #     data_v3_2_p1 = yaml.safe_load(fh)
 
+    print(data[0])
     fig1 = plot_rates_comparison(data[0]["rates"], data[1]["rates"], "CH3OH")
     fig1.update_layout(title_text="Phase 1")
 
