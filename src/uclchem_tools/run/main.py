@@ -3,9 +3,7 @@ import subprocess
 import pathlib
 import yaml
 import logging
-import warnings
-from tables import NaturalNameWarning
-import pandas as pd
+
 from importlib.metadata import version
 
 UCLCHEM_AVAIL = False
@@ -19,17 +17,7 @@ except ModuleNotFoundError:
     )
 
 
-def get_model(name):
-    return {
-        "cloud": uclchem.model.cloud,
-        "hot_core": uclchem.model.hot_core,
-        "collapse": uclchem.model.collapse,
-        "cshock": uclchem.model.cshock,
-        "jshock": uclchem.model.jshock,
-    }[name]
-
-
-def get_parser():
+def get_cli_parser():
     parser = ArgumentParser(description="info", formatter_class=RawTextHelpFormatter)
     parser.add_argument(
         "configpaths", nargs="+", help="A (list of) configuration file(s)", type=str
@@ -42,7 +30,7 @@ def get_parser():
 
 if __name__ == "__main__":
     # See if we need to run using a venv or not. If so, recall ourselves and use the venv.
-    args = get_parser()
+    args = get_cli_parser()
 
     if args.venvpath:
         logging.info(f"Running with virtual environment at {args.venvpath}")
@@ -52,7 +40,8 @@ if __name__ == "__main__":
         )
     elif UCLCHEM_AVAIL:
         # Only import the rates module if AMUSE is there.
-        from rates import get_rates_of_change, rates_to_dfs
+        from model import run_model
+        from uclchem_tools.io.csv_to_hdf import full_output_csv_to_hdf
 
         UCLCHEM_VERSION = version("uclchem")
         logging.info(f"Running with UCLCHEM version {UCLCHEM_VERSION}")
@@ -60,20 +49,21 @@ if __name__ == "__main__":
             with open(configpath) as fh:
                 config = yaml.safe_load(fh)
             # retrieve the name of the model, whether it is a key or a dict with additional arguments:
-            if isinstance(config["model"], str):
-                name = config["model"]
-                model_args = {}
-            elif isinstance(config["model"], dict):
-                name = str(list(config["model"].keys())[0])
-                model_args = config["model"][name]
-            # Obtain the model from uclchem
-            model = get_model(name)
-            # Run UCLCHEM
-            model(
-                param_dict=config["param_dict"],
-                out_species=config["outspecies"],
-                **model_args,
-            )
+            if config["settings"]["run_model"]:
+                if isinstance(config["model"], str):
+                    name = config["model"]
+                    model_args = {}
+                elif isinstance(config["model"], dict):
+                    name = str(list(config["model"].keys())[0])
+                    model_args = config["model"][name]
+                run_model(
+                    name,
+                    config["param_dict"],
+                    config["outspecies"],
+                    model_args,
+                )
+
+            # if config["settings"]["to_hdf"]:
             # CONVERT (csv -> hdf)
             csvpath = config["param_dict"]["outputFile"]
             datakey = pathlib.Path(csvpath).stem
@@ -83,33 +73,14 @@ if __name__ == "__main__":
                 hdfpath = config["settings"]["hdf_save"]
             else:
                 hdfpath = False
-            # print(hdfpath)
-            with warnings.catch_warnings():
-                warnings.filterwarnings("ignore", category=NaturalNameWarning)
-                with pd.HDFStore(hdfpath, complevel=9, complib="zlib") as store:
-                    df = uclchem.analysis.read_output_file(csvpath)
-                    store.put(datakey + "/abundances", df)
-                    store.get_storer(datakey + "/abundances").attrs.metadata = config
-                    # Add reactions and species from current UCLCHEM install
-                    reactions = uclchem.utils.get_reaction_table()
-                    species = uclchem.utils.get_species_table()
-                    store.put(datakey + "/reactions", reactions)
-                    store.put(datakey + "/species", species)
-                    # POSTPROCESS UCLCHEM obtain the rates
-                    rates_dict = get_rates_of_change(df, species, reactions)
-                    if "Name" in species:
-                        names = list(species["Name"])
-                    elif "NAME" in species:
-                        names = list(species["NAME"])
-                    for specie in names:
-                        df_rates, df_production, df_destruction = rates_to_dfs(
-                            rates_dict, specie
-                        )
-                        store.put(f"{datakey}/rates/total_rates/{specie}", df_rates)
-                        store.put(f"{datakey}/rates/production/{specie}", df_production)
-                        store.put(
-                            f"{datakey}/rates/destruction/{specie}", df_destruction
-                        )
+            if hdfpath:
+                full_output_csv_to_hdf(
+                    csvpath,
+                    hdfpath,
+                    datakey,
+                    config["settings"]["get_rates"],
+                    meta_data=config,
+                )
     else:
         logging.warning(
             "No UCLCHEM could be found and no virtualenv with uclchem was specified. Not running any code."
