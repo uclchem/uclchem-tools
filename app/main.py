@@ -135,14 +135,14 @@ def get_fig0(names_to_display):
     return fig
 
 
-def get_fig1(abundance_species, specie):
+def get_fig1(abundance_species, specie, df_key):
     fig1 = plot_rates_and_abundances_comparison(
-        data[0]["phase1Full"],
-        data[1]["phase1Full"],
+        data[0][df_key],
+        data[1][df_key],
         abundance_species,
         specie,
     )
-    fig1.update_layout(title_text="Phase 1")
+    fig1.update_layout(title_text=df_key)
     fig1.update_layout(
         height=1200,
     )
@@ -153,6 +153,7 @@ if __name__ == "__main__":
     # Data loading part:
     paths = ["comparison/v3.1/test-store.h5", "comparison/v3.2/test-store.h5"]
     data = [load_data(path) for path in paths]
+    phases_avail = list(data[0].keys())
     df_dict = {k: v for k, v in zip(paths, data)}
     # Load all possible species keys
     all_keys = get_unique_elements(df_dict)
@@ -175,7 +176,7 @@ if __name__ == "__main__":
             html.Span(id="example-output", style={"verticalAlign": "middle"}),
         ]
     )
-    fig1 = get_fig1(names_to_display, "H2O")
+    fig1 = get_fig1(names_to_display, "CH3OH", "phase1Full")
 
     dd2 = dcc.Dropdown(
         options=all_keys,
@@ -187,6 +188,11 @@ if __name__ == "__main__":
         value=names_to_display,
         id="dd3",
         multi=True,
+    )
+    dd4 = dcc.Dropdown(
+        options=phases_avail,
+        value=phases_avail[0],
+        id="dd4",
     )
     b2 = html.Div(
         [
@@ -201,13 +207,6 @@ if __name__ == "__main__":
         plot_temp=True,
     )
     fig2.update_layout(title_text="Phase 1")
-
-    dd4 = dcc.Dropdown(
-        options=all_keys,
-        value=names_to_display,
-        id="dd4",
-        multi=True,
-    )
 
     # Dash things:
     app = Dash(
@@ -264,12 +263,23 @@ if __name__ == "__main__":
         # from the shown select list, but still part of the `value`.
         return [o for o in all_keys if search_value in o or o in (value or [])]
 
+    @app.callback(Output("dd4", "options"), Input("dd4", "search_value"))
+    def update_options(search_value):
+        if not search_value:
+            raise PreventUpdate
+        return [o for o in phases_avail if search_value in o]
+
     @app.callback(
         Output("graph-2-tabs-dcc", "figure"),
-        [Input("button2", "n_clicks"), State("dd2", "value"), State("dd3", "value")],
+        [
+            Input("button2", "n_clicks"),
+            State("dd2", "value"),
+            State("dd3", "value"),
+            State("dd4", "value"),
+        ],
     )
-    def on_button_click(n, selected_specie, abundance_species):
-        fig = get_fig1(abundance_species, selected_specie)
+    def on_button_click(n, selected_specie, abundance_species, df_key):
+        fig = get_fig1(abundance_species, selected_specie, df_key)
         return fig
 
     #
@@ -333,6 +343,7 @@ if __name__ == "__main__":
                     ),
                     dd2,
                     dd3,
+                    dd4,
                     b2,
                 ]
             )

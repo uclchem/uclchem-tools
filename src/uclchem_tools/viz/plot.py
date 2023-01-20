@@ -4,8 +4,15 @@ from cycler import cycler
 from matplotlib.lines import Line2D
 
 import plotly.graph_objects as go
+import plotly.express as px
 from plotly.subplots import make_subplots
 import numpy as np
+
+
+def get_color(idx):
+    colors = px.colors.qualitative.D3
+    return colors[idx % len(colors)]
+
 
 from .process import process_data, sort_by_intersection
 
@@ -65,6 +72,8 @@ def _plot_abundance(fig, df, species, col=1, row=1, grouptitle=None, **plot_kwar
                 name=specName + addendum,
                 legendgroup=f"{row},{col}",
                 legendgrouptitle_text=grouptitle,
+                marker_color=get_color(specIndx),
+                hovertemplate="%{y:.2e}",
                 line=dict(dash=linestyle),
             ),
             col=col,
@@ -96,7 +105,7 @@ def plot_abundances_comparison(
             rows=height,
             cols=width,
             subplot_titles=list(model_names.values()),
-            shared_xaxes="all",
+            shared_xaxes="columns",
             vertical_spacing=0.03,
         )
 
@@ -127,10 +136,10 @@ def plot_abundances_comparison(
                 grouptitle=f"{df_key}: {model}",
             )
             # If we are in lower rows, fix the y-axis so they are identical for all rows but temperature
-            if idx_i > 0:
+            if idx_j > 0:
                 fig.layout[
                     f"yaxis{idx_i*len(runs_to_include)+idx_j+1}"
-                ].matches = f"y{idx_j+1}"
+                ].matches = f"y{idx_i+1}"
         # Only plot the temperature once at the end
 
     for idx_j, model in enumerate(model_names):
@@ -325,6 +334,7 @@ def plot_rates(df, df_dest, df_prod, fig=None, col=1, linedict={}, groupname=Non
                 legendgroup="1",
                 legendgrouptitle_text="Rates",
                 mode="lines+markers",
+                hoverlabel=dict(namelength=-1),
             ),
             col=col,
             row=1,
@@ -333,7 +343,7 @@ def plot_rates(df, df_dest, df_prod, fig=None, col=1, linedict={}, groupname=Non
     ]
 
     # Plot the contribution of each reaction to the production ...
-    for prod_term in df_prod:
+    for idx, prod_term in enumerate(df_prod):
         print(f"Production reactions {groupname}")
         #
         fig.add_trace(
@@ -345,12 +355,15 @@ def plot_rates(df, df_dest, df_prod, fig=None, col=1, linedict={}, groupname=Non
                 legendgrouptitle_text=f"Production reactions {groupname if groupname else ''}",
                 legendgroup="2" + str(groupname),
                 mode="lines+markers",
+                hovertemplate="%{y:.2e}",
+                hoverlabel=dict(namelength=-1),
+                marker_color=get_color(idx),
             ),
             col=col,
             row=2,
         )
     # ... and the destruction despectively.
-    for dest_term in df_dest:
+    for idx, dest_term in enumerate(df_dest):
         # f"Destruction reactions {groupname}"
         fig.add_trace(
             go.Scatter(
@@ -361,6 +374,9 @@ def plot_rates(df, df_dest, df_prod, fig=None, col=1, linedict={}, groupname=Non
                 legendgrouptitle_text=f"Destruction reactions {groupname if groupname else ''}",
                 legendgroup="3" + str(groupname),
                 mode="lines+markers",
+                hovertemplate="%{y:.2e}",
+                hoverlabel=dict(namelength=-1),
+                marker_color=get_color(idx),
             ),
             col=col,
             row=3,
@@ -368,7 +384,7 @@ def plot_rates(df, df_dest, df_prod, fig=None, col=1, linedict={}, groupname=Non
 
     fig.update_layout(legend=dict(groupclick="toggleitem"), hovermode="x unified")
     fig.update_xaxes(type="log", tickformat="~e")
-    fig.update_xaxes(title_text="Time (yr)", row=3, col=1)
+    # fig.update_xaxes(title_text="Time (yr)", row=3, col=1)
     fig.update_yaxes(type="log")
     # Scientific units for the rates, percentages for the contribution of the reactions.
     [
@@ -397,6 +413,7 @@ def plot_rates_and_abundances_comparison(
         + ["Abundances"] * 2,
         shared_xaxes="all",
         vertical_spacing=0.03,
+        shared_yaxes="rows",
     )
     d1 = process_data(data1["rates"], rates_species)
     d2 = process_data(data2["rates"], rates_species)
@@ -404,7 +421,7 @@ def plot_rates_and_abundances_comparison(
     d1, d2 = sort_by_intersection(d1, d2, "df_dest")
     d1, d2 = sort_by_intersection(d1, d2, "df_prod")
     plot_rates(**d1, fig=fig, col=1, groupname="left")
-    plot_rates(**d2, fig=fig, col=2, linedict=dict(dash="dash"), groupname="right")
+    plot_rates(**d2, fig=fig, col=2, groupname="right")
 
     _plot_abundance(
         fig, data1["abundances"], abundance_species, col=1, row=4, grouptitle="left"
