@@ -34,6 +34,18 @@ def to_h5py(fh, key, df):
     fh.create_dataset(f"/{key}_header", data=df.columns.values)
 
 
+def read_h5py(fh, dataset_key):
+    if isinstance(dataset_key, list):
+        dataset_key = "/".join(dataset_key)
+    data = fh[dataset_key]
+    dataset_header_key = dataset_key + "_header"
+    if dataset_header_key in fh:
+        header = fh[dataset_header_key]
+        return pd.DataFrame(data, columns=[col.decode("UTF-8") for col in header[:]])
+    else:
+        return pd.DataFrame(data)
+
+
 def full_output_csv_to_hdf(
     csv_path: str,
     hdf_path: str,
@@ -97,44 +109,46 @@ def full_output_csv_to_hdf(
                     fh.create_dataset(
                         "/index_species_lookup", data=species_lookup_table
                     )
-                # For all the headers of the reactants/products, replace them with integers.
-                for reaction_header in reactions:
-                    if reaction_header.startswith(
-                        "Reactant"
-                    ) or reaction_header.startswith("Product"):
-                        reactions[
-                            f"{reaction_header[:4].lower()}_index_{reaction_header[-1]}"
-                        ] = (
-                            reactions[reaction_header]
-                            .apply(lambda x: species_lookup[str(x).upper()])
-                            .astype("int32")
-                        )
-                # Identical for the names of the species in the index:
-                species["name_index"] = (
-                    species["NAME"]
-                    .apply(lambda x: species_lookup[x.upper()])
-                    .astype("int32")
-                )
-                # Drop the expensive text columns
-                reactions = reactions.drop(
-                    [
-                        header
-                        for header in reactions
-                        if header.startswith("Reactant") or header.startswith("Product")
-                    ],
-                    axis=1,
-                )
-                species = species.drop(["NAME"], axis=1)
-                # Sort the indices, so they move to the front:
-                reactions = reactions[
-                    sorted(reactions.columns, key=lambda x: "index" not in x)
-                ]
-                species = species[
-                    sorted(species.columns, key=lambda x: "index" not in x)
-                ]
+                if not "reactions" in fh:
+                    # For all the headers of the reactants/products, replace them with integers.
+                    for reaction_header in reactions:
+                        if reaction_header.startswith(
+                            "Reactant"
+                        ) or reaction_header.startswith("Product"):
+                            reactions[
+                                f"{reaction_header[:4].lower()}_index_{reaction_header[-1]}"
+                            ] = (
+                                reactions[reaction_header]
+                                .apply(lambda x: species_lookup[str(x).upper()])
+                                .astype("int32")
+                            )
+                    # Identical for the names of the species in the index:
+                    species["name_index"] = (
+                        species["NAME"]
+                        .apply(lambda x: species_lookup[x.upper()])
+                        .astype("int32")
+                    )
+                    # Drop the expensive text columns
+                    reactions = reactions.drop(
+                        [
+                            header
+                            for header in reactions
+                            if header.startswith("Reactant")
+                            or header.startswith("Product")
+                        ],
+                        axis=1,
+                    )
+                    species = species.drop(["NAME"], axis=1)
+                    # Sort the indices, so they move to the front:
+                    reactions = reactions[
+                        sorted(reactions.columns, key=lambda x: "index" not in x)
+                    ]
+                    species = species[
+                        sorted(species.columns, key=lambda x: "index" not in x)
+                    ]
 
-                to_h5py(fh, f"{datakey}/reactions", reactions)
-                to_h5py(fh, f"{datakey}/species", species)
+                    to_h5py(fh, f"/reactions", reactions)
+                    to_h5py(fh, f"/species", species)
 
             else:
                 raise NotImplementedError(
