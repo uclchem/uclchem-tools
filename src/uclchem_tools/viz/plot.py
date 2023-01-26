@@ -190,9 +190,9 @@ def plot_abundances_comparison2(
         "phase2Full": "Hot Core",
         "staticFull": "Static Cloud",
     }
-    height = len(dfs) + 1 if plot_temp else 0
+    height = len(dfs) + (1 if plot_temp else 0)
     width = 1
-
+    print(len(dfs), dfs)
     if not fig:
         fig = make_subplots(
             rows=height,
@@ -201,7 +201,8 @@ def plot_abundances_comparison2(
             shared_xaxes="all",
             vertical_spacing=0.03,
         )
-
+    # print(dfs)
+    print(len(dfs))
     for idx_i, df in enumerate(dfs):
         # Handle creating a total ice abundance (bulk + surface).
         for spec in species_to_plot:
@@ -415,8 +416,8 @@ def plot_rates_and_abundances_comparison(
         vertical_spacing=0.03,
         shared_yaxes="rows",
     )
-    d1 = process_data(data1["rates"], rates_species)
-    d2 = process_data(data2["rates"], rates_species)
+    d1 = process_data(data1, rates_species)
+    d2 = process_data(data2, rates_species)
     # Make sure that the
     d1, d2 = sort_by_intersection(d1, d2, "df_dest")
     d1, d2 = sort_by_intersection(d1, d2, "df_prod")

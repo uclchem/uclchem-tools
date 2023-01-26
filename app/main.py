@@ -3,8 +3,9 @@ import yaml
 import numpy as np
 import plotly.graph_objects as go
 from tqdm import tqdm
+import logging
 
-from uclchem_tools import (
+from uclchem_tools.viz.plot import (
     plot_rates,
     plot_rates_comparison,
     plot_abundances_comparison,
@@ -12,6 +13,7 @@ from uclchem_tools import (
     plot_rates_and_abundances_comparison,
 )
 from uclchem_tools.viz.process import process_data
+from uclchem_tools.io.io import DataLoaderCSV, DataLoaderHDF
 
 # Dash things:
 from plotly.subplots import make_subplots
@@ -29,185 +31,357 @@ def analyze_rates(data, specie):
     return plot_rates(**d1)
 
 
-class lazy_df_dict:
-    def __init__(
-        self,
-        h5root,
-        key,
-        walker,
-    ):
-        self.h5root = h5root
-        self.key = key
-        self.walker = walker
-        self.values_dict = {}
-
-    def __getitem__(self, key):
-        if not isinstance(self.values_dict[key], pd.DataFrame):
-            with pd.HDFStore(self.h5root, complevel=9, complib="zlib") as store:
-                self.values_dict[key] = store.get(f"{self.walker}/{key}")
-        return self.values_dict[key]
-
-    def __setitem__(self, key, value):
-        self.values_dict[key] = value
-
-    def keys(self):
-        return self.values_dict.keys()
-
-    def values(self):
-        return self.values_dict.values()
-
-
-def load_data(h5root):
-    # Lazy loading non-leaves gives weird behaviour.
-    lazy_level = 2
-    with pd.HDFStore(h5root, complevel=9, complib="zlib") as store:
-        read_dict = {}
-        for walker in tqdm(store.walk("/")):
-            # walker: (root, children, leaves)
-            # Walk throught the levels of the dictionary to walk the h5 tree:
-            access_read_dict = read_dict
-            # We need to filter the root "/" for better behaviour
-            dict_path = walker[0][1:].split("/")
-            if dict_path != [""]:
-                for key in dict_path:
-                    access_read_dict = access_read_dict[key]
-            # Create the children of the node
-            for key in walker[1]:
-                # Only lazy load the deeper datasets (since there are many!)
-                if len(dict_path) >= lazy_level:
-                    access_read_dict[key] = lazy_df_dict(
-                        h5root, key, f"{walker[0]}/{key}"
-                    )
-                else:
-                    access_read_dict[key] = {}
-            # Create the leaf nodes, which are dataframes.
-            for key in walker[2]:
-                if len(dict_path) >= lazy_level:
-                    access_read_dict[key] = f"{walker[0]}/{key}"
-                else:
-                    access_read_dict[key] = store.get(f"{walker[0]}/{key}")
-
-            # print(f"root: {walker[0]}, keys: {walker[1]}, datasets: {walker[2]}" )
-    return read_dict
-
-
 def get_unique_elements(data_dict):
     all_elements = []
-    for df in data_dict.values():
-        for data_keys in df:
-            all_elements.append(df[data_keys]["abundances"].columns.values)
-    all_elements = list(np.unique(np.concatenate(all_elements)))
+    # for data_store in data_dict.values():
+    for data_key in data_dict.keys():
+        all_elements += data_dict[data_key]["species"]
+    all_elements = list(np.unique(all_elements))
     for spec in all_elements:
         if spec.startswith("#") and spec.replace("#", "$") not in all_elements:
             all_elements.append(spec.replace("#", "$"))
         elif spec.startswith("@") and spec.replace("@", "$") not in all_elements:
             all_elements.append(spec.replace("@", "$"))
 
-    [
-        all_elements.remove(nonspecies)
-        for nonspecies in [
-            "Time",
-            "Density",
-            "gasTemp",
-            "av",
-            "zeta",
-            "point",
-            "radfield",
-        ]
-    ]
+    for nonspecies in [
+        "Time",
+        "Density",
+        "gasTemp",
+        "av",
+        "zeta",
+        "point",
+        "radfield",
+    ]:
+        if nonspecies in all_elements:
+            all_elements.remove(nonspecies)
     return all_elements
 
 
 # More dash things:
 
 
-def get_fig0(names_to_display):
-    # names_to_display += ["Collapsing Cloud", "Hot Core", "Static Cloud"]
-    fig = plot_abundances_comparison(
-        df_dict,
-        names_to_display,
-        # ["H2+", "H2", "CO", "H3+"],
-        list(df_dict.keys()),
-        list(df_dict.keys())[0],
-        verbose=False,
-        plot_temp=True,
-    )
-    return fig
+config = {"mode": "csv", "get_rates": False}  # or hdf
 
 
-def get_fig1(abundance_species, specie, df_key):
-    fig1 = plot_rates_and_abundances_comparison(
-        data[0][df_key],
-        data[1][df_key],
-        abundance_species,
-        specie,
-    )
-    fig1.update_layout(title_text=df_key)
-    fig1.update_layout(
-        height=1200,
-    )
-    return fig1
+def load_csv(paths: list, matchstring: str = "*Full.dat"):
+    # paths = ["comparison/v3.1/", "comparison/v3.2/"]
+    data = [DataLoaderCSV(p, "*Full.dat", get_rates=True) for p in paths]
+    return {k: v for k, v in zip(paths, data)}
+
+
+def load_hdf(paths):
+    if paths is not list:
+        paths = [paths]
+    data = [DataLoaderHDF(p) for p in paths]
+    return {k: v for k, v in zip(paths, data)}
+
+
+# PLOT THINGS
+
+
+class LeftRightAbundancesPlot:
+    """Compare abundances on the left and the right."""
+
+    def __init__(datasets):
+        pass
+
+
+class TestComparisonPlot:
+    """Compare the abundances in UCLCHEM to another on"""
+
+    def __init__(self, datasets, app, id="testcompare"):
+        self.datasets = datasets
+        self.id = id
+        self._app = app
+
+    def get_fig(self, names_to_display):
+        # names_to_display += ["Collapsing Cloud", "Hot Core", "Static Cloud"]
+        fig = plot_abundances_comparison(
+            self.datasets,
+            names_to_display,
+            list(self.datasets.keys()),
+            list(self.datasets.keys())[0],
+            verbose=False,
+            plot_temp=True,
+        )
+        return fig
+
+    def get_view(self):
+        fig = self.get_fig(
+            [
+                "H",
+                "H2",
+                "$H",
+                "H2O",
+                "$H2O",
+                "CO",
+                "$CO",
+                "$CH3OH",
+                "CH3OH",
+            ]
+        )
+        dropdown, button = self.get_dash_options()
+        return html.Div(
+            [
+                html.H3("Comparing abundances"),
+                dcc.Graph(figure=fig + "-fig", id=self.id),
+                dropdown,
+                button,
+            ]
+        )
+
+    def get_dash_options(
+        self,
+        default_species=[
+            "H",
+            "H2",
+            "$H",
+            "H2O",
+            "$H2O",
+            "CO",
+            "$CO",
+            "$CH3OH",
+            "CH3OH",
+        ],
+    ):
+        app = self._app
+        all_keys = get_unique_elements(self.datasets)
+        if any(map(lambda key: not key in all_keys, default_species)):
+            logging.warning(
+                "Not all default species are defined, defaulting to no species"
+            )
+            default_species = []
+        dd = dcc.Dropdown(
+            options=all_keys,
+            value=default_species,
+            id=self.id + "-dropdown",
+            multi=True,
+        )
+        button = html.Div(
+            [
+                dbc.Button("Refresh", id=self.id + "-refresh-button", n_clicks=0),
+                html.Span(
+                    id=self.id + "example-output", style={"verticalAlign": "middle"}
+                ),
+            ]
+        )
+
+        @app.callback(
+            Output(self.id + "-dropdown", "options"),
+            Input(self.id + "-dropdown", "search_value"),
+            State(self.id + "-dropdown", "value"),
+        )
+        def update_multi_options(self, search_value, value):
+            if not search_value:
+                raise PreventUpdate
+            # Make sure that the set values are in the option list, else they will disappear
+            # from the shown select list, but still part of the `value`.
+            return [o for o in all_keys if search_value in o or o in (value or [])]
+
+        @app.callback(
+            Output(self.id + "-fig", "figure"),
+            [
+                Input(self.id + "-refresh-button", "n_clicks"),
+                State(self.id + "-dropdown", "value"),
+            ],
+        )
+        def on_button_click(self, n, selected_species):
+            print(n)
+            fig = self.get_fig(selected_species)
+            return fig
+
+        return dd, button
+
+
+#
+#
+#
+#
+
+
+class LeftRightAbundancesAndRatesPlot:
+    """Inspect both the rates and the adbundances between two datasets"""
+
+    def __init__(self, datasets, app, id="lr-abundanceandrates"):
+        print(datasets)
+        self.datasets = datasets
+        self.has_rates = (
+            "rates" in datasets.keys()[0]
+        )  # check if the first data element has rates present
+        self._app = app
+        self.id = id
+
+    def get_view(self):
+        # fig = self.get_fig(
+        #     "H2O", "H2O", self.datasets.keys()[0], self.datasets.keys()[1]
+        # )
+        if self.has_rates:
+            fig = self.get_fig(
+                ["H2O"], "H2O", self.datasets.keys()[0], self.datasets.keys()[1]
+            )
+        else:
+            fig = self.get_fig_no_rates(
+                ["H2O"], "H2O", self.datasets.keys()[0], self.datasets.keys()[1]
+            )
+        # return fig
+
+        options = self.get_dash_options()
+        print(options)
+        interactive_list = list(options.values())
+        return html.Div(
+            [
+                html.H3("Comparing abundances and rates"),
+                dcc.Graph(
+                    id=self.id + "-fig",
+                    figure=fig,
+                ),
+            ]
+            + interactive_list
+        )
+
+    def get_dash_options(
+        self,
+        default_species=[
+            "H",
+            "H2",
+            "$H",
+            "H2O",
+            "$H2O",
+            "CO",
+            "$CO",
+            "$CH3OH",
+            "CH3OH",
+        ],
+    ):
+        app = self._app
+        all_keys = get_unique_elements(self.datasets)
+        if any(map(lambda key: not key in all_keys, default_species)):
+            logging.warning(
+                "Not all default species are defined, defaulting to no species"
+            )
+            default_species = []
+        options_dict = {}
+        options_dict["select_rates"] = dcc.Dropdown(
+            options=all_keys,
+            value="H2O",
+            id=self.id + "-select-rates",
+        )
+        options_dict["select_species"] = dcc.Dropdown(
+            options=all_keys,
+            value=default_species,
+            id=self.id + "-select-species",
+            multi=True,
+        )
+        options_dict["select-data1"] = dcc.Dropdown(
+            options=self.datasets.keys(),
+            value=self.datasets.keys()[0],
+            id=self.id + "-select-data1",
+        )
+        options_dict["select-data2"] = dcc.Dropdown(
+            options=self.datasets.keys(),
+            value=self.datasets.keys()[1],
+            id=self.id + "-select-data2",
+        )
+        options_dict["refresh-button"] = html.Div(
+            [
+                dbc.Button("Refresh", id=self.id + "-refresh-button", n_clicks=0),
+                html.Span(
+                    id=self.id + "example-output", style={"verticalAlign": "middle"}
+                ),
+            ]
+        )
+
+        @app.callback(
+            Output(self.id + "-select-species", "options"),
+            Input(self.id + "-select-species", "search_value"),
+        )
+        def update_options(search_value):
+            if not search_value:
+                raise PreventUpdate
+            return [o for o in all_keys if search_value in o]
+
+        @app.callback(
+            Output(self.id + "-select-rates", "options"),
+            Input(self.id + "-select-species", "search_value"),
+            State(self.id + "-select-species", "value"),
+        )
+        def update_multi_options(search_value, value):
+            if not search_value:
+                raise PreventUpdate
+            # Make sure that the set values are in the option list, else they will disappear
+            # from the shown select list, but still part of the `value`.
+            return [o for o in all_keys if search_value in o or o in (value or [])]
+
+        @app.callback(
+            Output(self.id + "-select-data1", "options"),
+            Input(self.id + "-select-data1", "search_value"),
+        )
+        def update_options(search_value):
+            if not search_value:
+                raise PreventUpdate
+            return [o for o in self.dataset.keys() if search_value in o]
+
+        @app.callback(
+            Output(self.id + "-select-data2", "options"),
+            Input(self.id + "-select-data2", "search_value"),
+        )
+        def update_options(search_value):
+            if not search_value:
+                raise PreventUpdate
+            return [o for o in self.dataset.keys() if search_value in o]
+
+        @app.callback(
+            Output(self.id, "figure"),
+            [
+                Input(self.id + "-refresh-button", "n_clicks"),
+                State(self.id + "-select-rates", "value"),
+                State(self.id + "-select-species", "value"),
+                State(self.id + "-select-data1", "value"),
+                State(self.id + "-select-data2", "value"),
+            ],
+        )
+        def on_button_click(n, selected_specie, abundance_species, d1, d2):
+            if self.has_rates:
+                fig = self.get_fig(abundance_species, selected_specie, d1, d2)
+            else:
+                fig = self.get_fig_no_rates(abundance_species, selected_specie, d1, d2)
+            return fig
+
+        return options_dict
+
+    def get_fig(self, abundance_species, specie, data_key_1, data_key_2):
+        fig = plot_rates_and_abundances_comparison(
+            self.datasets[data_key_1],
+            self.datasets[data_key_2],
+            abundance_species,
+            specie,
+        )
+        fig.update_layout(title_text=f"{data_key_1} vs {data_key_2}")
+        fig.update_layout(
+            height=1200,
+        )
+        return fig
+
+    def get_fig_no_rates(self, abundance_species, specie, data_key_1, data_key_2):
+        fig = plot_abundances_comparison2(
+            [
+                self.datasets[data_key_1]["abundances"],
+                self.datasets[data_key_2]["abundances"],
+            ],
+            abundance_species,
+        )
+        fig.update_layout(title_text=f"{data_key_1} vs {data_key_2}")
+        fig.update_layout(
+            height=1200,
+        )
+        return fig
 
 
 if __name__ == "__main__":
-    # Data loading part:
-    paths = ["comparison/v3.1/test-store.h5", "comparison/v3.2/test-store.h5"]
-    data = [load_data(path) for path in paths]
-    phases_avail = list(data[0].keys())
-    df_dict = {k: v for k, v in zip(paths, data)}
-    # Load all possible species keys
-    all_keys = get_unique_elements(df_dict)
-    names_to_display = ["H", "H2", "$H", "H2O", "$H2O", "CO", "$CO", "$CH3OH", "CH3OH"]
-    fig = get_fig0(names_to_display)
-    # names = [d.name for d in fig.data]
-    dd1 = dcc.Dropdown(
-        options=all_keys,
-        value=names_to_display,
-        id="dd1",
-        multi=True,
-    )
-    # refresh_fig(fig, names, names_to_display=names_to_display)
-    fig.update_layout(
-        height=1200,
-    )
-    b1 = html.Div(
-        [
-            dbc.Button("Refresh", id="button1", n_clicks=0),
-            html.Span(id="example-output", style={"verticalAlign": "middle"}),
-        ]
-    )
-    fig1 = get_fig1(names_to_display, "CH3OH", "phase1Full")
 
-    dd2 = dcc.Dropdown(
-        options=all_keys,
-        value="H2O",
-        id="dd2",
-    )
-    dd3 = dcc.Dropdown(
-        options=all_keys,
-        value=names_to_display,
-        id="dd3",
-        multi=True,
-    )
-    dd4 = dcc.Dropdown(
-        options=phases_avail,
-        value=phases_avail[0],
-        id="dd4",
-    )
-    b2 = html.Div(
-        [
-            dbc.Button("Refresh", id="button2", n_clicks=0),
-            html.Span(id="example-output", style={"verticalAlign": "middle"}),
-        ]
-    )
-
-    fig2 = plot_abundances_comparison2(
-        [data[0]["phase1Full"]["abundances"], data[1]["phase1Full"]["abundances"]],
-        ["CH3OH2+", "$CH3OH", "CH3OH"],
-        plot_temp=True,
-    )
-    fig2.update_layout(title_text="Phase 1")
-
+    datasets = list(
+        load_hdf("/home/vermarien/data2/reduction-project/test.h5").values()
+    )[0]
     # Dash things:
     app = Dash(
         __name__,
@@ -215,105 +389,23 @@ if __name__ == "__main__":
         suppress_callback_exceptions=True,
     )
 
-    #
-    # TAB 1
-    #
-    @app.callback(
-        Output("dd1", "options"),
-        Input("dd1", "search_value"),
-        State("dd1", "value"),
-    )
-    def update_multi_options(search_value, value):
-        if not search_value:
-            raise PreventUpdate
-        # Make sure that the set values are in the option list, else they will disappear
-        # from the shown select list, but still part of the `value`.
-        return [o for o in all_keys if search_value in o or o in (value or [])]
-
-    @app.callback(
-        Output("graph-1-tabs-dcc", "figure"),
-        [
-            Input("button1", "n_clicks"),
-            State("dd1", "value"),
-        ],
-    )
-    def on_button_click(n, selected_species):
-        fig = get_fig0(selected_species)
-        return fig
-
-    #
-    # TAB 2
-    #
-
-    @app.callback(Output("dd2", "options"), Input("dd2", "search_value"))
-    def update_options(search_value):
-        if not search_value:
-            raise PreventUpdate
-        return [o for o in all_keys if search_value in o]
-
-    @app.callback(
-        Output("dd3", "options"),
-        Input("dd3", "search_value"),
-        State("dd3", "value"),
-    )
-    def update_multi_options(search_value, value):
-        if not search_value:
-            raise PreventUpdate
-        # Make sure that the set values are in the option list, else they will disappear
-        # from the shown select list, but still part of the `value`.
-        return [o for o in all_keys if search_value in o or o in (value or [])]
-
-    @app.callback(Output("dd4", "options"), Input("dd4", "search_value"))
-    def update_options(search_value):
-        if not search_value:
-            raise PreventUpdate
-        return [o for o in phases_avail if search_value in o]
-
-    @app.callback(
-        Output("graph-2-tabs-dcc", "figure"),
-        [
-            Input("button2", "n_clicks"),
-            State("dd2", "value"),
-            State("dd3", "value"),
-            State("dd4", "value"),
-        ],
-    )
-    def on_button_click(n, selected_specie, abundance_species, df_key):
-        fig = get_fig1(abundance_species, selected_specie, df_key)
-        return fig
-
-    #
-    # TAB 3
-    #
-    # @app.callback(
-    #     Output("dd3", "options"),
-    #     Input("dd3", "search_value"),
-    #     State("dd3", "value"),
-    # )
-    # def update_multi_options(search_value, value):
-    #     if not search_value:
-    #         raise PreventUpdate
-    #     # Make sure that the set values are in the option list, else they will disappear
-    #     # from the shown select list, but still part of the `value`.
-    #     return [o for o in all_keys if search_value in o or o in (value or [])]
-
-    # @app.callback(Output("dd4", "options"), Input("dd4", "search_value"))
-    # def update_options(search_value):
-    #     if not search_value:
-    #         raise PreventUpdate
-    #     return [o for o in all_keys if search_value in o]
+    tab_dict = {}
+    if True:
+        tab_dict["compare_abundances_and_rates"] = LeftRightAbundancesAndRatesPlot(
+            datasets, app, id="compare_abundances_and_rates"
+        )
+    if True:
+        tab_dict["uclchem_test_compare"] = TestComparisonPlot(
+            datasets, app, id="uclchem_test_compare"
+        )
 
     app.layout = html.Div(
         [
             html.H1("UCLCHEM-viz DEMO"),
             dcc.Tabs(
                 id="tabs-example-graph",
-                value="tab-1-example-graph",
-                children=[
-                    dcc.Tab(label="Compare abundances", value="tab-1-example-graph"),
-                    dcc.Tab(label="Compare more", value="tab-2-example-graph"),
-                    dcc.Tab(label="Inspect one", value="tab-3-example-graph"),
-                ],
+                value=list(tab_dict)[0],  # "tab-1-example-graph",
+                children=[dcc.Tab(label=key, value=key) for key in tab_dict],
             ),
             html.Div(id="tabs-content-example-graph"),
         ]
@@ -324,40 +416,22 @@ if __name__ == "__main__":
         Input("tabs-example-graph", "value"),
     )
     def render_content(tab):
-        if tab == "tab-1-example-graph":
-            return html.Div(
-                [
-                    html.H3("Comparing abundances"),
-                    dcc.Graph(figure=fig, id="graph-1-tabs-dcc"),
-                    dd1,
-                    b1,
-                ]
-            )
-        elif tab == "tab-2-example-graph":
-            return html.Div(
-                [
-                    html.H3("Comparing abundances and rates"),
-                    dcc.Graph(
-                        id="graph-2-tabs-dcc",
-                        figure=fig1,
-                    ),
-                    dd2,
-                    dd3,
-                    dd4,
-                    b2,
-                ]
-            )
-        elif tab == "tab-3-example-graph":
-            return html.Div(
-                [
-                    html.H3("In depth rate exploration: under construction"),
-                    html.Div(children=(html.Div(), html.Div()))
-                    # dcc.Graph(
-                    #     id="graph-3-tabs-dcc",
-                    #     figure=fig2,
-                    # ),
-                ]
-            )
+        return tab_dict[tab].get_view()
+        # if tab == "tab-1-example-graph":
+        #     return
+        # elif tab == "tab-2-example-graph":
+        #     return
+        # elif tab == "tab-3-example-graph":
+        #     return html.Div(
+        #         [
+        #             html.H3("In depth rate exploration: under construction"),
+        #             html.Div(children=(html.Div(), html.Div()))
+        #             # dcc.Graph(
+        #             #     id="graph-3-tabs-dcc",
+        #             #     figure=fig2,
+        #             # ),
+        #         ]
+        #     )
 
     # app.layout = html.Div(
     #     children=[
