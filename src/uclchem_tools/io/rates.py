@@ -154,8 +154,10 @@ def get_rates_of_change(result_df, species, reactions, rate_threshold=0.99):
 
 
 def rates_to_dfs(data, specie):
-    if not data[specie]:
+    if (not specie in data) or (len(data[specie]) == 0):
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+    # print(data.keys(), specie)
+    # print(data[specie])
     key_destruction_reactions = {}
     key_production_reactions = {}
     data_copy = deepcopy(data[specie])
