@@ -99,7 +99,7 @@ class TestComparisonPlot:
         fig = plot_abundances_comparison(
             self.datasets,
             names_to_display,
-            list(self.datasets.keys()),
+            list(self.datasets.keys())[:10],
             list(self.datasets.keys())[0],
             verbose=False,
             plot_temp=True,
@@ -186,7 +186,7 @@ class TestComparisonPlot:
             ],
         )
         def on_button_click(self, n, selected_species):
-            print(n)
+            print(f"Got click number {n}")
             fig = self.get_fig(selected_species)
             return fig
 
@@ -286,7 +286,7 @@ class LeftRightAbundancesAndRatesPlot:
             [
                 dbc.Button("Refresh", id=self.id + "-refresh-button", n_clicks=0),
                 html.Span(
-                    id=self.id + "example-output", style={"verticalAlign": "middle"}
+                    id=self.id + "example-output", style={"verticalAlign": "right"}
                 ),
             ]
         )
@@ -331,7 +331,7 @@ class LeftRightAbundancesAndRatesPlot:
             return [o for o in self.dataset.keys() if search_value in o]
 
         @app.callback(
-            Output(self.id, "figure"),
+            Output(self.id + "-fig", "figure"),
             [
                 Input(self.id + "-refresh-button", "n_clicks"),
                 State(self.id + "-select-rates", "value"),
@@ -341,6 +341,7 @@ class LeftRightAbundancesAndRatesPlot:
             ],
         )
         def on_button_click(n, selected_specie, abundance_species, d1, d2):
+            print(f"Got click number {n}")
             if self.has_rates:
                 fig = self.get_fig(abundance_species, selected_specie, d1, d2)
             else:
