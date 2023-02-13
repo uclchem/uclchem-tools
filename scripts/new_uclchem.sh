@@ -1,15 +1,22 @@
+#!/bin/bash
+# Script to generate a new git wortkree based on the root uclchem directory
+# Example: script/new_uclchem.sh new_directory_for_branch the_commitish_we_want
 if [[ -n $1 ]]; then
-    if [[ -e ../../$1 ]]; then
+    if [[ -e ../$1 ]]; then
         echo "worktree directory $1 already exists, aborting."
     else
-        module load git/2.33.1-GCCcore-11.2.0-nodocs
         if [[ -n $2 ]]; then
             COMMITISH=$2
         else
             COMMITISH=main
         fi
         echo Creating new worktree in ../$1 based on commit $COMMITISH 
-        cd ../../root_uclchem &&
+        if [[ -e "../root_uclchem" ]]; then
+            echo "Root uclchem already exists, continuing"
+        else
+            git clone git@github.com:uclchem/uclchem ../root_uclchem
+        fi
+        cd ../root_uclchem &&
         git worktree add -d ../$1 $COMMITISH &&
         cd ../$1 &&
         python -m venv .venv &&
