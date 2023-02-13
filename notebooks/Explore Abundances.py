@@ -188,6 +188,9 @@ def on_change(a):
 render_button.on_click(on_change)
 
 # %%
+dfs["v3.1.0.h5"].keys()
+
+# %%
 # display(container)
 # display(render_button)
 fig = plot_abundances_comparison(

@@ -53,3 +53,7 @@ MANIFEST
 .venv*/
 .conda*/
 .python-version
+
+# UCLCHEM files:
+*.dat
+*.h5

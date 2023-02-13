@@ -16,9 +16,6 @@ import pathlib
 import logging
 import glob
 
-# from uclchem.makerates.reaction import reaction_types
-
-
 if __name__ == "__main__":
     raise NotImplementedError("A wrapper for this function still needs to be written.")
 
@@ -83,12 +80,15 @@ def full_output_csv_to_hdf(
             reactions = uclchem.utils.get_reaction_table()
             species = uclchem.utils.get_species_table()
             if assume_identical_networks:
+
                 # TODO: refactor with species lookup table to get all integers instead of mixed data types.
                 # SPECIE 0 is NAN
                 if "index_species_lookup" in fh:
                     isl = fh["index_species_lookup"][:]
                     species_lookup = {k.decode("UTF-8"): int(v) for k, v in isl}
                 else:
+                    from uclchem.makerates.reaction import reaction_types
+
                     species_lookup = {
                         spec: i
                         for i, spec in enumerate(
@@ -196,6 +196,8 @@ class GridConverter:
             logging.warning(
                 "Obtaining all rates is very expensive, this will take a while."
             )
+        if not isinstance(model_df, pd.DataFrame):
+            model_df = pd.read_csv(model_df)
         # Save model_df with the model dataframe as a pandas object (inefficient, but we only store it once.)
         model_df["storage_id"] = self.get_storage_id(model_df)
         model_df.to_hdf(hdf_path, "model_df")
@@ -294,10 +296,11 @@ class DataLoaderCSV:
 class DataLoaderHDF:
     """Loads results as written to a common hdf datastore (see GridConverter for the format)"""
 
-    def __init__(self, hdf_path):
+    def __init__(self, hdf_path, h5mode="r"):
         self.hdf_path = hdf_path
-        self.h5file = h5py.File(hdf_path, mode="r")
         self.models_df = pd.read_hdf(hdf_path, "model_df")
+        self.h5file = h5py.File(hdf_path, mode=h5mode)
+        self.h5mode = h5mode
         self.datasets = self.models_df["storage_id"].to_list()
         self.get_rates = "rates" in self.datasets[0]
         self._lookup_index_to_species = self.get_lookup_index_to_species()
@@ -363,3 +366,6 @@ class DataLoaderHDF:
             "species": self.species,
             **temp_dict,
         }
+
+    def close(self):
+        self.h5file.close()

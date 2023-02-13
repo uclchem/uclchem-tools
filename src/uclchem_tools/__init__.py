@@ -14,11 +14,3 @@ except PackageNotFoundError:  # pragma: no cover
     __version__ = "unknown"
 finally:
     del version, PackageNotFoundError
-
-from .viz.plot import (
-    plot_abundances_comparison,
-    plot_rates_comparison,
-    plot_rates,
-    plot_abundances_comparison2,
-    plot_rates_and_abundances_comparison,
-)
