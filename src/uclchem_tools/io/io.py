@@ -1,6 +1,6 @@
 import pandas as pd
 import uclchem
-from .rates import get_rates_of_change, rates_to_dfs
+from .rates import get_rates_of_change, rates_to_dfs, get_abundances_derivative
 
 import yaml
 import sys
@@ -15,6 +15,7 @@ from tqdm import tqdm
 import pathlib
 import logging
 import glob
+
 
 if __name__ == "__main__":
     raise NotImplementedError("A wrapper for this function still needs to be written.")
@@ -45,6 +46,7 @@ def full_output_csv_to_hdf(
     hdf_path: str,
     datakey: str = "",
     get_rates: bool = False,
+    derivatives_path: str = None,
     assume_identical_networks: bool = False,
     storage_backend: str = "h5py",
 ):
@@ -76,11 +78,13 @@ def full_output_csv_to_hdf(
                 raise RuntimeError(
                     "I found different abundances columns from the first entry, stopping."
                 )
+            if derivatives_path:
+                derivatives = pd.read_csv()
+                to_h5py(fh, f"{datakey}/derivatives", derivatives)
             # Add reactions and species from current UCLCHEM install
             reactions = uclchem.utils.get_reaction_table()
             species = uclchem.utils.get_species_table()
             if assume_identical_networks:
-
                 # TODO: refactor with species lookup table to get all integers instead of mixed data types.
                 # SPECIE 0 is NAN
                 if "index_species_lookup" in fh:
@@ -188,7 +192,11 @@ class GridConverter:
     """Convert a list of models run on a grid to a HDF dataset."""
 
     def __init__(
-        self, hdf_path: pathlib.Path, model_df: pd.DataFrame, get_rates: bool = False
+        self,
+        hdf_path: pathlib.Path,
+        model_df: pd.DataFrame,
+        get_rates: bool = False,
+        store_derivatives: bool = False,
     ):
         if pathlib.Path(hdf_path).exists():
             raise RuntimeError("The store already exists, stoppping")
@@ -196,6 +204,7 @@ class GridConverter:
             logging.warning(
                 "Obtaining all rates is very expensive, this will take a while."
             )
+
         if not isinstance(model_df, pd.DataFrame):
             model_df = pd.read_csv(model_df)
         # Save model_df with the model dataframe as a pandas object (inefficient, but we only store it once.)
@@ -209,6 +218,9 @@ class GridConverter:
                 row["storage_id"],
                 get_rates=get_rates,
                 assume_identical_networks=True,
+                derivatives_path=row["outputDerivativeFile"]
+                if store_derivatives
+                else None,
             )
 
     def get_storage_id(self, model_df):
@@ -235,7 +247,7 @@ class DataLoaderCSV:
         self.model_df = pd.DataFrame()
         self.model_df["FullOutput"] = csv_files
         self.model_df["storage_id"] = [p.stem for p in self.model_df["FullOutput"]]
-        self.species = self.get_species()["Name"].to_list()
+        self.species = self.get_species()["NAME"].to_list()
         self.reactions = self.get_reactions()
         self.csv_store = {}
         self.rates_store = {}
@@ -298,10 +310,18 @@ class DataLoaderHDF:
 
     def __init__(self, hdf_path, h5mode="r"):
         self.hdf_path = hdf_path
-        self.models_df = pd.read_hdf(hdf_path, "model_df")
+        try:
+            self.models_df = pd.read_hdf(hdf_path, "model_df")
+            self.datasets = self.models_df["storage_id"].to_list()
+        except KeyError:
+            with h5py.File(hdf_path, mode=h5mode) as fh:
+                self.datasets = list(fh.keys())
+                print(
+                    "No model DataFrame, obtained these keys instead (filter at your own discretion):",
+                    self.datasets,
+                )
         self.h5file = h5py.File(hdf_path, mode=h5mode)
         self.h5mode = h5mode
-        self.datasets = self.models_df["storage_id"].to_list()
         self.get_rates = "rates" in self.datasets[0]
         self._lookup_index_to_species = self.get_lookup_index_to_species()
         self.species_table = self._load_species_table()
