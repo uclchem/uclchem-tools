@@ -41,7 +41,7 @@ if __name__ == "__main__":
     elif UCLCHEM_AVAIL:
         # Only import the rates module if AMUSE is there.
         from model import run_model
-        from uclchem_tools.io.csv_to_hdf import full_output_csv_to_hdf
+        from uclchem_tools.io.io import full_output_csv_to_hdf
 
         UCLCHEM_VERSION = version("uclchem")
         logging.info(f"Running with UCLCHEM version {UCLCHEM_VERSION}")
@@ -78,8 +78,8 @@ if __name__ == "__main__":
                     csvpath,
                     hdfpath,
                     datakey,
-                    config["settings"]["get_rates"],
-                    meta_data=config,
+                    get_rates=config["settings"]["get_rates"],
+                    assume_identical_networks=True,
                 )
     else:
         logging.warning(

@@ -79,7 +79,7 @@ def full_output_csv_to_hdf(
                     "I found different abundances columns from the first entry, stopping."
                 )
             if derivatives_path:
-                derivatives = pd.read_csv()
+                derivatives = pd.read_csv(derivatives_path, index_col=0)
                 to_h5py(fh, f"{datakey}/derivatives", derivatives)
             # Add reactions and species from current UCLCHEM install
             reactions = uclchem.utils.get_reaction_table()

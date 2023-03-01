@@ -213,6 +213,7 @@ def get_abundances_derivative(abundances_df, param_dict):
         param_dict["initialtemp"] = row["gasTemp"]
         param_dict["zeta"] = row["zeta"]
         param_dict["radfield"] = row["radfield"]
+        print(param_dict)
         row_ = row.iloc[6:-1]
         input_abund[: len(row_)] = row_
         rates = uclchemwrap.get_odes(param_dict, input_abund)
