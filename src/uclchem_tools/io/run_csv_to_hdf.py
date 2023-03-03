@@ -35,6 +35,7 @@ def get_parser():
 
 
 if __name__ == "__main__":
+    raise NotImplementedError("Currently broken by code changes in io")
     config_files = get_parser()["configpaths"]
     for args in config_files:
         with open(args) as fh:

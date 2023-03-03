@@ -18,3 +18,4 @@ model:
 settings:
   hdf_save: examples/test/test-store.h5
   get_rates: true
+  run_model: true

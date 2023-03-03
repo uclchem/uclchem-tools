@@ -5,6 +5,8 @@ import pandas as pd
 import uclchem
 from joblib import Parallel, delayed
 
+from uclchem.uclchemwrap import uclchemwrap
+
 
 def key_reactions_to_dict(
     time, total_production, total_destruction, key_reactions, key_changes
@@ -48,7 +50,12 @@ def _get_rate_of_chance(result_df, reactions, species, species_name, rate_thresh
             # recreate the parameter dictionary needed to get accurate rates
             param_dict = uclchem.analysis._param_dict_from_output(row)
             # get the rate of all reactions from UCLCHEM along with a few other necessary values
-            (rates, transfer, swap, bulk_layers,) = uclchem.analysis._get_species_rates(
+            (
+                rates,
+                transfer,
+                swap,
+                bulk_layers,
+            ) = uclchem.analysis._get_species_rates(
                 param_dict, row[species], species_index, fortran_reac_indxs
             )
 
@@ -171,9 +178,44 @@ def rates_to_dfs(data, specie):
     df = pd.DataFrame.from_dict(data_copy).transpose()
     df.set_index("time", inplace=True)
     df.index.set_names("Time", inplace=True)
-    df["total_destruction"] *= -1  # make destruction positive so we can plot it.
+    df["total_destruction"] *= -1.0  # make destruction positive so we can plot it.
     df_dest = pd.DataFrame.from_dict(key_destruction_reactions).transpose()
     df_dest.index.set_names(["Time"], inplace=True)
     df_prod = pd.DataFrame.from_dict(key_production_reactions).transpose()
     df_prod.index.set_names(["Time"], inplace=True)
     return df, df_prod, df_dest
+
+
+### NEW STUFF
+
+
+def get_abundances_derivative(abundances_df, param_dict):
+    """This function takes the abundance and environment parameters at each timestep,
+    then reinitializes the simulation with the physics parameters to obtain the deriative.
+
+    Args:
+        abundances (_type_): _description_
+        param_dict (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    if "finalTime" in param_dict:
+        # pop these 3 as they are not supported?
+        param_dict.pop("finalTime")
+        param_dict.pop("baseAv")
+        param_dict.pop("freezeFactor")
+    derivatives_df = abundances_df.copy()
+    # for idx, row in tqdm(abundances_df.iterrows(), total=len(abundances_df)):
+    for idx, row in abundances_df.iterrows():
+        input_abund = np.zeros(500)
+        param_dict["initialdens"] = row["Density"]
+        param_dict["initialtemp"] = row["gasTemp"]
+        param_dict["zeta"] = row["zeta"]
+        param_dict["radfield"] = row["radfield"]
+        print(param_dict)
+        row_ = row.iloc[6:-1]
+        input_abund[: len(row_)] = row_
+        rates = uclchemwrap.get_odes(param_dict, input_abund)
+        derivatives_df.iloc[idx, 6:-1] = rates[: len(row_)]
+    return derivatives_df

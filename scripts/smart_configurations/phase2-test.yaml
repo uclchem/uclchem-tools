@@ -20,5 +20,6 @@ model:
     temp_indx: 3
     max_temperature: 300.0
 settings:
-  hdf_save: examples/test/test-store.h5
+  hdf_save: examples/test/test-store.h5 # If a path, save to the path, else save to the same name as the csv.
   get_rates: true
+  run_model: true
