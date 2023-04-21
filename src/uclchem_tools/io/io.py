@@ -323,7 +323,7 @@ class DataLoaderCSV:
 class DataLoaderHDF:
     """Loads results as written to a common hdf datastore (see GridConverter for the format)"""
 
-    def __init__(self, h5path, h5mode="r", keep_h5_open=True):
+    def __init__(self, h5path, h5mode="r"):
         try:
             self.models_df = pd.read_hdf(h5path, "model_df")
             self.datasets = self.models_df["storage_id"].to_list()
@@ -336,8 +336,6 @@ class DataLoaderHDF:
                 )
         self.h5path = h5path
         self.h5mode = h5mode
-        self.keep_h5_open = keep_h5_open
-        self.open_hdf(self.h5path, self.h5mode)
         self.get_rates = "rates" in self.datasets[0]
         self._lookup_index_to_species = self.get_lookup_index_to_species()
         self.species_table = self._load_species_table()
@@ -345,14 +343,8 @@ class DataLoaderHDF:
         self.species = list(self.species_table["NAME"])
         self.reactions = None
 
-    def open_hdf(self, h5path: str, h5mode: str) -> None:
-        if self.keep_h5_open:
-            self.h5file = h5py.File(h5path, mode=h5mode)
-        else:
-            self.h5file = h5path
-
     def get_h5_filehandle(self) -> h5py.File:
-        return self.h5file if self.keep_h5_open else h5py.File(self.h5path, self.h5mode)
+        return h5py.File(self.h5path, self.h5mode)
 
     def get_lookup_index_to_species(self):
         with self.get_h5_filehandle() as fh:
@@ -419,7 +411,3 @@ class DataLoaderHDF:
                 "species": self.species,
                 **temp_dict,
             }
-
-    def close(self):
-        if self.keep_h5_open:
-            self.h5file.close()
