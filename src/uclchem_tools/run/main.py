@@ -1,4 +1,5 @@
 from argparse import ArgumentParser, RawTextHelpFormatter
+import importlib
 import subprocess
 import pathlib
 import yaml
@@ -8,7 +9,7 @@ from importlib.metadata import version
 
 UCLCHEM_AVAIL = False
 try:
-    import uclchem
+    importlib.util.find_spec("uclchem")
 
     UCLCHEM_AVAIL = True
 except ModuleNotFoundError:
@@ -63,12 +64,14 @@ if __name__ == "__main__":
                     model_args,
                 )
 
-            # if config["settings"]["to_hdf"]:
-            # CONVERT (csv -> hdf)
+            # Retrieve the name of the output file and convert it to hdf5 if requested:
             csvpath = config["param_dict"]["outputFile"]
+            # The datakey is the name of the file without the extension:
             datakey = pathlib.Path(csvpath).stem
-            if config["settings"]["hdf_save"] == True:
+            # If the hdf_save is True, we convert the file to a standalone hdf5 in the same directory.
+            if config["settings"]["hdf_save"] is True:
                 hdfpath = csvpath.with_suffix(".hdf5")
+            # If the hdf_save is a string, we save the hdf5 file in the specified directory.
             elif config["settings"]["hdf_save"]:
                 hdfpath = config["settings"]["hdf_save"]
             else:

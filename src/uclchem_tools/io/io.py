@@ -1,15 +1,12 @@
 from typing import Union
 import pandas as pd
 import uclchem
-from .rates import get_rates_of_change, rates_to_dfs, get_abundances_derivative
+from .rates import get_rates_of_change, rates_to_dfs
 
-import yaml
-import sys
 import os
 
 import warnings
 from tables import NaturalNameWarning
-import pandas as pd
 import h5py
 import numpy as np
 from tqdm import tqdm
@@ -17,8 +14,7 @@ import pathlib
 import logging
 import glob
 
-import h5pickle
-
+from pathlib import Path
 
 if __name__ == "__main__":
     raise NotImplementedError("A wrapper for this function still needs to be written.")
@@ -175,10 +171,14 @@ def full_output_csv_to_hdf(
             species = uclchem.utils.get_species_table()
             rates_dict = get_rates_of_change(df, species, reactions)
             # Lazy fix to parse both old and new versions species format:
-            if "Name" in species:
-                names = list(species["Name"])
-            elif "NAME" in species:
-                names = list(species["NAME"])
+            names = None
+            for possible_name_key in ["Name", "NAME", "name"]:
+                if possible_name_key in species:
+                    names = list(species[possible_name_key])
+            if names is None:
+                raise RuntimeError(
+                    "Could not find the species names in the species table, stopping."
+                )
             for specie in names:
                 df_rates, df_production, df_destruction = rates_to_dfs(
                     rates_dict, specie
@@ -208,44 +208,143 @@ class GridConverter:
 
     def __init__(
         self,
-        hdf_path: pathlib.Path,
-        model_df: pd.DataFrame,
+        hdf_path: Path,
+        model_df: Union[Path, pd.DataFrame],
+        abundances_dir: Path = None,
+        derivatives_dir: Path = None,
         get_rates: bool = False,
-        store_derivatives: bool = False,
     ):
+        """
+        Initializes an instance of the IO class.
+
+        Args:
+            hdf_path (pathlib.Path): The path to the HDF5 file to store the grid in.
+            model_df (Union[Path, pd.DataFrame]): The path to the CSV file containing the model data, or a pandas DataFrame containing the model data.
+            abundances_dir (Path, optional): The path to the directory containing the abundance files
+                (in case the data was moved compared to the time the model_df was generated). Defaults to None.
+            derivatives_dir (Path, optional): The path to the directory containing the derivative files. Defaults to None.
+            get_rates (bool, optional): Whether to obtain all rates directly from UCLCHEM. Defaults to False.
+        """
         if pathlib.Path(hdf_path).exists():
             raise RuntimeError("The store already exists, stoppping")
+        # Make sure the directories are Path objects:
+        abundances_dir = Path(abundances_dir) if abundances_dir else None
+        derivatives_dir = Path(derivatives_dir) if derivatives_dir else None
+
         if get_rates:
             logging.warning(
                 "Obtaining all rates is very expensive, this will take a while."
             )
-
         if not isinstance(model_df, pd.DataFrame):
-            model_df = pd.read_csv(model_df)
+            if not isinstance(model_df, Path):
+                model_df = Path(model_df)
+            if model_df.suffix == ".csv":
+                model_df = pd.read_csv(model_df, index_col=0)
+            elif model_df.suffix == ".h5":
+                model_df = pd.read_hdf(model_df, "model_df")
+            else:
+                raise (
+                    RuntimeError(
+                        "Unknown file format, please provide a csv or hdf file."
+                    )
+                )
+        # See if the files are present in the original location:
+        if abundances_dir:
+            old_abundance_dir, model_df["storage_path"] = self.process_outputFile(
+                model_df["outputFile"]
+            )
+            model_df["abundances_path"] = [
+                str(abundances_dir / file_name)
+                for file_name in model_df["storage_path"]
+            ]
+            model_df["storage_id"] = [
+                Path(file_name).stem for file_name in model_df["storage_path"]
+            ]
+        else:
+            model_df["abundances_path"] = model_df["outputFile"]
+        if derivatives_dir:
+            assert (
+                abundances_dir
+            ), "You can only run derivatives dir after running abundance_dir."
+            # Use the abundances_path to make sure we don't have to do any matching.
+            model_df["derivatives_path"] = [
+                str(derivatives_dir / file_name)
+                for file_name in model_df["abundances_path"]
+            ]
+
         # Save model_df with the model dataframe as a pandas object (inefficient, but we only store it once.)
         model_df["storage_id"] = self.get_storage_id(model_df)
+        # Write the model dataframe to the store:
         model_df.to_hdf(hdf_path, "model_df")
+
         for idx, row in tqdm(enumerate(model_df.iterrows()), total=len(model_df)):
             row = row[1]  # throw away the pandas index
             full_output_csv_to_hdf(
-                row["outputFile"],
+                row["abundances_path"],
                 hdf_path,
                 row["storage_id"],
                 get_rates=get_rates,
                 assume_identical_networks=True,
-                derivatives_path=row["outputDerivativeFile"]
-                if store_derivatives
-                else None,
+                derivatives_path=row["derivatives_path"] if derivatives_dir else None,
             )
 
+    def process_outputFile(self, output_files, strict_check=False):
+        """Function that obtains the common directory and individual filenames of the output files.
+
+        Args:
+            output_files (list[Union[str, Path]]): The model dataframe
+
+        Returns:
+            common_directory (str): The common directory of the output files
+
+        Example: a directory files following outputFiles:
+            - /home/user/some/very/long/and/completely/unnecessary/path/grid_0.csv
+            - /home/user/some/very/long/and/completely/unnecessary/path/grid_1.csv
+            - /home/user/some/very/long/and/completely/unnecessary/path/grid_2.csv
+        Will return:
+            (/home/user/some/very/long/and/completely/unnecessary/path/,
+            ["grid_0.csv", "grid_1.csv", "grid_2.csv"])
+        """
+        common_directory = Path(os.path.commonpath((output_files[0], output_files[1])))
+        if strict_check:
+            for path in output_files:
+                if common_directory != Path(path).parent:
+                    raise RuntimeError(
+                        "The output files are not all in the same directory!"
+                    )
+        filenames = [Path(output_file).name for output_file in output_files]
+        return common_directory, filenames
+
     def get_storage_id(self, model_df):
-        return [f"grid_{i}" for i in range(len(model_df))]
+        if "storage_id" in model_df:
+            return model_df["storage_id"]
+        else:
+            logging.warning(
+                f"Cannot find `storage_id`, enumerating the {len(model_df)} models by grid_0, grid_1, ..."
+            )
+            return [f"grid_{i}" for i in list(model_df.index)]
 
 
 class DataLoaderCSV:
     """Loads CSV data from several full output files generated by UCLCHEM"""
 
-    def __init__(self, csv_directory, match_statement="*Full.dat", get_rates=False):
+    def __init__(
+        self,
+        csv_directory: str,
+        match_statement: str = "*Full.dat",
+        get_rates: bool = False,
+    ):
+        """Dataloader that can be used to load a whole grid of files.
+
+        Args:
+            csv_directory (str): _description_
+            match_statement (str, optional): _description_. Defaults to "*Full.dat".
+            get_rates (bool, optional): _description_. Defaults to False.
+
+        Raises:
+            RuntimeError: _description_
+            RuntimeError: _description_
+        """
         self.get_rates = get_rates
         if self.get_rates:
             logging.warning(
@@ -328,7 +427,7 @@ class DataLoaderHDF:
             self.models_df = pd.read_hdf(h5path, "model_df")
             self.datasets = self.models_df["storage_id"].to_list()
         except KeyError:
-            with h5pickle.File(h5path, mode=h5mode) as fh:
+            with h5py.File(h5path, mode=h5mode) as fh:
                 self.datasets = list(fh.keys())
                 print(
                     "No model DataFrame, obtained these keys instead (filter at your own discretion):",

@@ -1,3 +1,4 @@
+""" A copy of some core UCLCHEM function to make this package standalone."""
 from uclchem_tools.config import UCLCHEM_MASSES, UCLCHEM_ELEMENTS, UCLCHEM_SYMBOLS
 import pandas as pd
 

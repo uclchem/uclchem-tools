@@ -1,4 +1,4 @@
-from tqdm import tqdm
+"""File that deals with rates in UCLCHEM."""
 import numpy as np
 from copy import deepcopy
 import pandas as pd
@@ -45,7 +45,7 @@ def _get_rate_of_chance(result_df, reactions, species, species_name, rate_thresh
     species_index = species.index(species_name) + 1  # fortran index of species
     data = {}
     if len(reac_indxs) <= 500 and species_name not in ["BULK", "SURFACE"]:
-        failed_species = []
+        # failed_species = []
         for i, row in result_df.iterrows():
             # recreate the parameter dictionary needed to get accurate rates
             param_dict = uclchem.analysis._param_dict_from_output(row)
@@ -161,7 +161,7 @@ def get_rates_of_change(result_df, species, reactions, rate_threshold=0.99):
 
 
 def rates_to_dfs(data, specie):
-    if (not specie in data) or (len(data[specie]) == 0):
+    if (specie not in data) or (len(data[specie]) == 0):
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
     # print(data.keys(), specie)
     # print(data[specie])
